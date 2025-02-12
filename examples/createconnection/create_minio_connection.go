@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-
 	endpoint := "localhost:9000"
 	accessKeyID := "accesskey"
 	secretAccessKey := "secretkey"
@@ -24,7 +23,6 @@ func main() {
 	}, &minio.Options{
 		Secure: useSSL,
 	})
-
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -43,7 +41,6 @@ func main() {
 	}, &minio.Options{
 		Secure: useSSL,
 	})
-
 	if err != nil {
 		log.Fatalln(err)
 	}
