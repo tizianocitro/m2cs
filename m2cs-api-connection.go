@@ -47,6 +47,31 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 	return minioConn, nil
 }
 
+func NewAzBlobConnection(connectionOptions ConnectionOptions) (*connfilestorage.AzBlobConnection, error) {
+	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
+
+	if authConfing.GetConnectType() != "withCredential" &&
+		authConfing.GetConnectType() != "withEnv" &&
+		authConfing.GetConnectType() != "withConnectionString" {
+		return nil, fmt.Errorf("invalid connection method for Azure Blob; " +
+			"use: ConnectWithCredentials, ConnectWithEnvCredentials or ConnectWithConnectionString")
+	}
+
+	authConfing.SetProperties(connection.Properties{
+		IsMainInstance: connectionOptions.IsMainInstance,
+		SaveEncrypted:  connectionOptions.SaveEncrypt,
+		SaveCompressed: connectionOptions.SaveCompress,
+	})
+
+	azBlobConn, err := connfilestorage.CreateAzBlobConnection(authConfing)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return azBlobConn, nil
+}
+
 // ConnectWithCredentials returns a connectionFunc configured with the provided credentials.
 func ConnectWithCredentials(identity string, secretAccessKey string) connectionFunc {
 	authConfig := connection.NewAuthConfig() // Usa la funzione per creare l'oggetto
@@ -60,5 +85,13 @@ func ConnectWithCredentials(identity string, secretAccessKey string) connectionF
 func ConnectWithEnvCredentials() connectionFunc {
 	authConfig := &connection.AuthConfig{}
 	authConfig.SetConnectType("withEnv")
+	return authConfig
+}
+
+// ConnectWithEnvCredentials returns a connectionFunc configured with the connection string.
+func ConnectWithConnectionString(connectionString string) connectionFunc {
+	authConfig := &connection.AuthConfig{}
+	authConfig.SetConnectType("withConnectionString")
+	authConfig.SetConnectionString(connectionString)
 	return authConfig
 }
