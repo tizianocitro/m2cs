@@ -31,6 +31,10 @@ func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minio
 		}
 	}
 
+	if endpoint == "" {
+		endpoint = "localhost:9000"
+	}
+
 	switch config.GetConnectType() {
 	case "withCredential":
 		if config.GetAccessKey() == "" || config.GetSecretKey() == "" {
@@ -54,13 +58,11 @@ func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minio
 	}
 
 	minioClient, err := minio.New(endpoint, minioOptions)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MinIO client: %w", err)
 	}
 
 	_, err = minioClient.ListBuckets(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MinIO: %w", err)
 	}

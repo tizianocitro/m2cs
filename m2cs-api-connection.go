@@ -49,7 +49,7 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 	return minioConn, nil
 }
 
-func NewAzBlobConnection(connectionOptions ConnectionOptions) (*connfilestorage.AzBlobConnection, error) {
+func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (*connfilestorage.AzBlobConnection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
 		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
@@ -68,7 +68,7 @@ func NewAzBlobConnection(connectionOptions ConnectionOptions) (*connfilestorage.
 		SaveCompressed: connectionOptions.SaveCompress,
 	})
 
-	azBlobConn, err := connfilestorage.CreateAzBlobConnection(authConfing)
+	azBlobConn, err := connfilestorage.CreateAzBlobConnection(endpoint, authConfing)
 
 	if err != nil {
 		return nil, err
