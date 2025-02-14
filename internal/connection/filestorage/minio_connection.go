@@ -46,7 +46,7 @@ func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minio
 		minioOptions.Creds = credentials.NewStaticV4(accessKey, secretKey, "")
 
 	default:
-		return nil, fmt.Errorf("invalid connection type: %s", config.GetConnectType())
+		return nil, fmt.Errorf("invalid connection type for MinIO: %s", config.GetConnectType())
 	}
 
 	conn := &MinioConnection{

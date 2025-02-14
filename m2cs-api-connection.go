@@ -27,6 +27,9 @@ type connectionFunc *connection.AuthConfig
 // It returns a MinioConnection or an error if the connection could not be established.
 func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, minioOptions *minio.Options) (*connfilestorage.MinioConnection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
+	if authConfing == nil {
+		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+	}
 
 	if authConfing.GetConnectType() != "withCredential" && authConfing.GetConnectType() != "withEnv" {
 		return nil, fmt.Errorf("invalid connection method for MinIO; use: ConnectWithCredentials or ConnectWithEnvCredentials")
@@ -39,7 +42,6 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 	})
 
 	minioConn, err := connfilestorage.CreateMinioConnection(endpoint, authConfing, minioOptions)
-
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +51,9 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 
 func NewAzBlobConnection(connectionOptions ConnectionOptions) (*connfilestorage.AzBlobConnection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
+	if authConfing == nil {
+		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+	}
 
 	if authConfing.GetConnectType() != "withCredential" &&
 		authConfing.GetConnectType() != "withEnv" &&
