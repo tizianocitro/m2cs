@@ -72,7 +72,6 @@ func CreateAzBlobConnection(endpoint string, config *connection.AuthConfig) (*Az
 		} else {
 			accountURL = endpoint
 		}
-
 		client, err := azblob.NewClientWithSharedKeyCredential(accountURL, credential, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure Blob Storage client: %v", err)
