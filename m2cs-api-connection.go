@@ -69,12 +69,37 @@ func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (
 	})
 
 	azBlobConn, err := connfilestorage.CreateAzBlobConnection(endpoint, authConfing)
-
 	if err != nil {
 		return nil, err
 	}
 
 	return azBlobConn, nil
+}
+
+func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRegion string) (*connfilestorage.S3Connection, error) {
+	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
+	if authConfing == nil {
+		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+	}
+
+	if authConfing.GetConnectType() != "withCredential" &&
+		authConfing.GetConnectType() != "withEnv" {
+		return nil, fmt.Errorf("invalid connection method for AWS S3; " +
+			"use: ConnectWithCredentials or ConnectWithEnvCredentials")
+	}
+
+	authConfing.SetProperties(connection.Properties{
+		IsMainInstance: connectionOptions.IsMainInstance,
+		SaveEncrypted:  connectionOptions.SaveEncrypt,
+		SaveCompressed: connectionOptions.SaveCompress,
+	})
+
+	s3Conn, err := connfilestorage.CreateS3Connection(endpoint, authConfing, awsRegion)
+	if err != nil {
+		return nil, err
+	}
+
+	return s3Conn, nil
 }
 
 // ConnectWithCredentials returns a connectionFunc configured with the provided credentials.
