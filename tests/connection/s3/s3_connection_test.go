@@ -102,6 +102,29 @@ func TestCreateS3Connection_WithCredentials_MissingCredentials(t *testing.T) {
 	require.Nil(t, conn)
 }
 
+// TestCreateS3Connection_WithEnv_NoEnvCredentialSetup tests the behavior of CreateS3Connection function when
+// environment variables are not set. It ensures the function returns an appropriate error message indicating the
+// missing environment credentials.
+func TestCreateS3Connection_WithEnv_NoEnvCredentialSetup(t *testing.T) {
+	originalAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+	originalSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+	defer func() {
+		os.Setenv("AWS_ACCESS_KEY_ID", originalAccessKey)
+		os.Setenv("AWS_SECRET_ACCESS_KEY", originalSecretKey)
+	}()
+
+	config := &connection.AuthConfig{}
+	config.SetConnectType("withEnv")
+
+	conn, err := connfilestorage.CreateS3Connection(s3ServiceUrl, config, "")
+	require.Error(t, err, "expected error for no environment credential found, got nil")
+	assert.EqualError(t, err, "environment variables AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set")
+	require.Nil(t, conn)
+}
+
 // TestCreateS3Connection_WithCredentials_Success tests the behavior of CreateS3Connection function
 // when valid credentials are provided. It ensures the function returns a valid S3Connection.
 func TestCreateS3Connection_WithCredentials_Success(t *testing.T) {

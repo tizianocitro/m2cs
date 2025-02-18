@@ -9,8 +9,8 @@ import (
 
 func main() {
 	endpoint := "localhost:9000"
-	accessKeyID := "accesskey"
-	secretAccessKey := "secretkey"
+	accessKeyID := "m2csUser"
+	secretAccessKey := "m2csPassword"
 	useSSL := true
 
 	//================================================================================================
@@ -26,7 +26,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	log.Printf("%#v\n", conn) // minio connection is now setup
 
 	//================================================================================================
@@ -44,7 +43,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	log.Printf("%#v\n", conn) // minio connection is now setup
 
 	//================================================================================================

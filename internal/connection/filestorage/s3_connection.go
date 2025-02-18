@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"m2cs/internal/connection"
+	"os"
 )
 
 // S3Connection represents a connection to the AWS S3 service.
@@ -64,6 +65,12 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 			})
 		}
 	case "withEnv":
+		accountName := os.Getenv("AWS_ACCESS_KEY_ID")
+		accountKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+		if accountName == "" || accountKey == "" {
+			return nil, fmt.Errorf("environment variables AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set")
+		}
+
 		awsCfg, err := s3config.LoadDefaultConfig(context.TODO(),
 			s3config.WithRegion(awsRegion),
 		)
