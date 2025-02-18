@@ -1,4 +1,4 @@
-package connfilestorage_test
+package azblob_connection_test
 
 import (
 	"context"
@@ -38,6 +38,7 @@ func TestMain(m *testing.M) {
 	connectionString = fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=%s;AccountKey=%s;BlobEndpoint=%s;", azurite.AccountName, azurite.AccountKey, blobServiceURL)
 
 	code := m.Run()
+
 	os.Exit(code)
 }
 
@@ -77,7 +78,7 @@ func TestCreateAzBlobConnection_WithCredentials_InvalidCredentials(t *testing.T)
 	require.Nil(t, conn)
 }
 
-func TestCreateMinioConnection_WithEnv_NoEnvCredentialSetup(t *testing.T) {
+func TestCreateAzBlobConnection_WithEnv_NoEnvCredentialSetup(t *testing.T) {
 	originalAccessKey := os.Getenv("AZURE_STORAGE_ACCOUNT_NAME")
 	originalSecretKey := os.Getenv("AZURE_STORAGE_ACCOUNT_KEY")
 

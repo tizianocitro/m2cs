@@ -1,4 +1,4 @@
-package connfilestorage_test
+package minio_connection_test
 
 import (
 	"context"

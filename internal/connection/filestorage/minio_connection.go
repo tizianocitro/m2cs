@@ -24,14 +24,13 @@ func (m *MinioConnection) GetClient() *minio.Client {
 // It takes an endpoint, an AuthConfig, and optional MinIO options.
 // It returns a MinioConnection or an error if the connection could not be established.
 func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minioOptions *minio.Options) (*MinioConnection, error) {
-
 	if minioOptions == nil {
 		minioOptions = &minio.Options{
 			Secure: false,
 		}
 	}
 
-	if endpoint == "" {
+	if endpoint == "" || endpoint == "default" {
 		endpoint = "localhost:9000"
 	}
 
