@@ -7,6 +7,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"m2cs/internal/connection"
 	"os"
+	"strings"
 )
 
 // MinioConnection represents a connection to a MinIO server.
@@ -32,6 +33,12 @@ func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minio
 
 	if endpoint == "" || endpoint == "default" {
 		endpoint = "localhost:9000"
+	}
+
+	if strings.Contains(endpoint, "http://") {
+		endpoint = strings.Replace(endpoint, "http://", "", 1)
+	} else if strings.Contains(endpoint, "https://") {
+		endpoint = strings.Replace(endpoint, "https://", "", 1)
 	}
 
 	switch config.GetConnectType() {

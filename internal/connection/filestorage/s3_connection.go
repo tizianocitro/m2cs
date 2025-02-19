@@ -100,5 +100,7 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 		return nil, fmt.Errorf("failed to connect to AWS S3: %w", err)
 	}
 
+	conn.Properties = config.GetProperties()
+
 	return conn, nil
 }

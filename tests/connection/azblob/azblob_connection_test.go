@@ -38,7 +38,6 @@ func TestMain(m *testing.M) {
 	connectionString = fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=%s;AccountKey=%s;BlobEndpoint=%s;", azurite.AccountName, azurite.AccountKey, blobServiceURL)
 
 	code := m.Run()
-
 	os.Exit(code)
 }
 

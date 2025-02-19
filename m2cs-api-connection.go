@@ -28,7 +28,7 @@ type connectionFunc *connection.AuthConfig
 func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, minioOptions *minio.Options) (*connfilestorage.MinioConnection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
-		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+		return nil, fmt.Errorf("connectionMethod cannot be nil")
 	}
 
 	if authConfing.GetConnectType() != "withCredential" && authConfing.GetConnectType() != "withEnv" {
@@ -52,7 +52,7 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (*connfilestorage.AzBlobConnection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
-		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+		return nil, fmt.Errorf("connectionMethod cannot be nil")
 	}
 
 	if authConfing.GetConnectType() != "withCredential" &&
@@ -79,7 +79,7 @@ func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (
 func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRegion string) (*connfilestorage.S3Connection, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
-		return nil, fmt.Errorf("ConnectionMethod cannot be nil")
+		return nil, fmt.Errorf("connectionMethod cannot be nil")
 	}
 
 	if authConfing.GetConnectType() != "withCredential" &&
