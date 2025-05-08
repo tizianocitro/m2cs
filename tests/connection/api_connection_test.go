@@ -66,9 +66,9 @@ func TestMain(m *testing.M) {
 // =====================================================================================================================
 // Tests for Azure Blob connection
 
-// TestAzBlobConnection_ConnectionType_MethodNil tests the behavior of NewAzBlobConnection when a nil connection
+// TestNewAzBlobConnection_ConnectionType_MethodNil tests the behavior of NewAzBlobConnection when a nil connection
 // method is provided. It ensures the function returns an appropriate error message indicating the nil method.
-func TestAzBlobConnection_ConnectionType_MethodNil(t *testing.T) {
+func TestNewAzBlobConnection_ConnectionType_MethodNil(t *testing.T) {
 	conn, err := m2cs.NewAzBlobConnection(
 		azuriteEndpoint,
 		m2cs.ConnectionOptions{})
@@ -77,9 +77,9 @@ func TestAzBlobConnection_ConnectionType_MethodNil(t *testing.T) {
 	require.Nil(t, conn)
 }
 
-// TestAzBlobConnection_ConnectionType_InvalidConnType tests the behavior of NewAzBlobConnection when an invalid
+// TestNewAzBlobConnection_ConnectionType_InvalidConnType tests the behavior of NewAzBlobConnection when an invalid
 // connection type is provided. It ensures the function returns an appropriate error message indicating the invalid
-func TestAzBlobConnection_ConnectionType_InvalidConnType(t *testing.T) {
+func TestNewAzBlobConnection_ConnectionType_InvalidConnType(t *testing.T) {
 	cfg := &connection.AuthConfig{}
 	cfg.SetConnectType("InvalidConnectionTypeForAzblob")
 
@@ -93,9 +93,9 @@ func TestAzBlobConnection_ConnectionType_InvalidConnType(t *testing.T) {
 	require.Nil(t, conn)
 }
 
-// TestAzBlobConnection_WithCredentials_Success tests the creation of a new Azure Blob connection with credentials.
+// TestNewAzBlobConnection_WithCredentials_Success tests the creation of a new Azure Blob connection with credentials.
 // The test checks if the connection is created successfully and if it finds the test-container.
-func TestAzBlobConnection_WithCredentials_Success(t *testing.T) {
+func TestNewAzBlobConnection_WithCredentials_Success(t *testing.T) {
 	conn, err := m2cs.NewAzBlobConnection(
 		azuriteEndpoint,
 		m2cs.ConnectionOptions{
@@ -134,9 +134,9 @@ func TestAzBlobConnection_WithCredentials_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestAzBlobConnection_WithEnvCredentials_Success tests the creation of a new Azure Blob connection with environment
+// TestNewAzBlobConnection_WithEnvCredentials_Success tests the creation of a new Azure Blob connection with environment
 // credentials. The test checks if the connection is created successfully and if it finds the test-container.
-func TestAzBlobConnection_WithEnvCredentials_Success(t *testing.T) {
+func TestNewAzBlobConnection_WithEnvCredentials_Success(t *testing.T) {
 	originalAccessKey := os.Getenv("AZURE_STORAGE_ACCOUNT_NAME")
 	originalSecretKey := os.Getenv("AZURE_STORAGE_ACCOUNT_KEY")
 
@@ -184,9 +184,9 @@ func TestAzBlobConnection_WithEnvCredentials_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestAzBlobConnection_WithConnectionString_Success tests the creation of a new Azure Blob connection with connection
+// TestNewAzBlobConnection_WithConnectionString_Success tests the creation of a new Azure Blob connection with connection
 // string. The test checks if the connection is created successfully and if it finds the test-container.
-func TestAzBlobConnection_WithConnectionString_Success(t *testing.T) {
+func TestNewAzBlobConnection_WithConnectionString_Success(t *testing.T) {
 	conn, err := m2cs.NewAzBlobConnection(
 		"",
 		m2cs.ConnectionOptions{
@@ -304,9 +304,9 @@ func TestNewMinioConnection_WithEnvCredentials_Success(t *testing.T) {
 // =====================================================================================================================
 // Tests for Azure S3 connection
 
-// TestS3Connection_ConnectionType_MethodNil tests the behavior of NewS3Connection when a nil connection
+// TestNewS3Connection_ConnectionType_MethodNil tests the behavior of NewS3Connection when a nil connection
 // method is provided. It ensures the function returns an appropriate error message indicating the nil method.
-func TestS3Connection_ConnectionType_MethodNil(t *testing.T) {
+func TestNewS3Connection_ConnectionType_MethodNil(t *testing.T) {
 	conn, err := m2cs.NewS3Connection(
 		localstackEndpoint,
 		m2cs.ConnectionOptions{}, "")
@@ -315,9 +315,9 @@ func TestS3Connection_ConnectionType_MethodNil(t *testing.T) {
 	require.Nil(t, conn)
 }
 
-// TestS3Connection_ConnectionType_InvalidConnType tests the behavior of NewS3Connection when an invalid
+// TestNewS3Connection_ConnectionType_InvalidConnType tests the behavior of NewS3Connection when an invalid
 // connection type is provided. It ensures the function returns an appropriate error message indicating the invalid
-func TestS3Connection_ConnectionType_InvalidConnType(t *testing.T) {
+func TestNewS3Connection_ConnectionType_InvalidConnType(t *testing.T) {
 	conn, err := m2cs.NewS3Connection(
 		localstackEndpoint,
 		m2cs.ConnectionOptions{
@@ -328,9 +328,9 @@ func TestS3Connection_ConnectionType_InvalidConnType(t *testing.T) {
 	require.Nil(t, conn)
 }
 
-// TestS3Connection_WithCredentials_Success tests the creation of a new S3 connection with credentials.
+// TestNewS3Connection_WithCredentials_Success tests the creation of a new S3 connection with credentials.
 // The test checks if the connection is created successfully and if it finds the test-bucket.
-func TestS3Connection_WithCredentials_Success(t *testing.T) {
+func TestNewS3Connection_WithCredentials_Success(t *testing.T) {
 	conn, err := m2cs.NewS3Connection(
 		localstackEndpoint,
 		m2cs.ConnectionOptions{
@@ -360,9 +360,9 @@ func TestS3Connection_WithCredentials_Success(t *testing.T) {
 	require.True(t, find, "no test-bucket found")
 }
 
-// TestS3Connection_WithEnvCredentials_Success tests the creation of a new S3 connection with environment
+// TestNewS3Connection_WithEnvCredentials_Success tests the creation of a new S3 connection with environment
 // credentials. The test checks if the connection is created successfully and if it finds the test-bucket.
-func TestS3Connection_WithEnvCredentials_Success(t *testing.T) {
+func TestNewS3Connection_WithEnvCredentials_Success(t *testing.T) {
 	originalAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 	originalSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 
@@ -509,7 +509,7 @@ func runAndPopulateMinIOContainer(ctx context.Context) {
 		log.Fatalf("failed to get minio endpoint: %s", err)
 	}
 
-	minioClient, err := minio.New(strings.Replace(minioEndpoint, "", "", 1), &minio.Options{
+	minioClient, err := minio.New(strings.Replace(minioEndpoint, "http://", "", 1), &minio.Options{
 		Creds:  minioCredentials.NewStaticV4(minioUser, minioPassword, ""),
 		Secure: false,
 	})

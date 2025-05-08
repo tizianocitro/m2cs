@@ -5,6 +5,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"m2cs/internal/connection"
 	connfilestorage "m2cs/internal/connection/filestorage"
+	"m2cs/pkg/filestorage"
 )
 
 // ConnectionOptions holds the options for creating a connection.
@@ -25,7 +26,7 @@ type connectionFunc *connection.AuthConfig
 // NewMinIOConnection creates a new MinIO connection.
 // It takes an endpoint, connection options, and optional MinIO options.
 // It returns a MinioConnection or an error if the connection could not be established.
-func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, minioOptions *minio.Options) (*connfilestorage.MinioConnection, error) {
+func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, minioOptions *minio.Options) (*filestorage.MinioClient, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
 		return nil, fmt.Errorf("connectionMethod cannot be nil")
