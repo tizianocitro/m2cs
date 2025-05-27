@@ -15,7 +15,7 @@ type MinioClient struct {
 	properties common.ConnectionProperties
 }
 
-// NewMinioClient creates a MinioClient, which is a custom client from the m2cs package.
+// NewMinioClient creates a MinioClient, which is a cu stom client from the m2cs package.
 // This method initializes the custom client by wrapping an original MinIO client and
 // adding connection properties. The resulting client can then be used within the
 // context of the m2cs library.
@@ -76,7 +76,7 @@ func (m *MinioClient) RemoveBucket(ctx context.Context, bucketName string) error
 
 	err := m.client.RemoveBucket(ctx, bucketName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to remove bucket: %w", err)
 	}
 
 	return nil
@@ -111,9 +111,14 @@ func (m *MinioClient) PutObject(ctx context.Context, storeBox string, fileName s
 func (m *MinioClient) RemoveObject(ctx context.Context, storeBox string, fileName string) error {
 	opts := minio.RemoveObjectOptions{}
 
-	err := m.client.RemoveObject(context.Background(), storeBox, fileName, opts)
+	_, err := m.client.StatObject(context.Background(), storeBox, fileName, minio.GetObjectOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to remove object from minio bucket: %w", err)
+	}
+
+	err = m.client.RemoveObject(context.Background(), storeBox, fileName, opts)
+	if err != nil {
+		return fmt.Errorf("failed to remove object from minio bucket: %w", err)
 	}
 
 	return nil
