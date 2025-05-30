@@ -5,30 +5,19 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"m2cs/internal/connection"
+	common "m2cs/pkg"
+	"m2cs/pkg/filestorage"
 	"os"
 )
 
-// AzBlobConnection represents a connection to an Azure Blob Storage.
-type AzBlobConnection struct {
-	client *azblob.Client
-	connection.Properties
-}
-
-// GetClient returns the Azure Blob Storage client.
-func (a *AzBlobConnection) GetClient() *azblob.Client {
-	return a.client
-}
-
-// CreateAzBlobConnection creates a new AzBlobConnection.
-// It returns a AzBlobConnection or an error if the connection could not be established.
-func CreateAzBlobConnection(endpoint string, config *connection.AuthConfig) (*AzBlobConnection, error) {
+// CreateAzBlobConnection creates a new AzBlobClient.
+// It returns an AzBlobClient or an error if the connection could not be established.
+func CreateAzBlobConnection(endpoint string, config *connection.AuthConfig) (*filestorage.AzBlobClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("AuthConfig cannot be nil")
 	}
 
-	conn := &AzBlobConnection{
-		Properties: config.GetProperties(),
-	}
+	var azClient *azblob.Client = nil
 
 	switch config.GetConnectType() {
 	case "withCredential":
@@ -53,7 +42,7 @@ func CreateAzBlobConnection(endpoint string, config *connection.AuthConfig) (*Az
 			return nil, fmt.Errorf("failed to create Azure Blob Storage client: %v", err)
 		}
 
-		conn.client = client
+		azClient = client
 	case "withEnv":
 		accountName := os.Getenv("AZURE_STORAGE_ACCOUNT_NAME")
 		accountKey := os.Getenv("AZURE_STORAGE_ACCOUNT_KEY")
@@ -77,26 +66,31 @@ func CreateAzBlobConnection(endpoint string, config *connection.AuthConfig) (*Az
 			return nil, fmt.Errorf("failed to create Azure Blob Storage client: %v", err)
 		}
 
-		conn.client = client
+		azClient = client
 	case "withConnectionString":
 		client, err := azblob.NewClientFromConnectionString(config.GetConnectionString(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure Blob Storage client: %v", err)
 		}
 
-		conn.client = client
+		azClient = client
 	default:
 		return nil, fmt.Errorf("invalid connection type for azure blob: %s", config.GetConnectType())
 	}
-	if conn.client == nil {
+	if azClient == nil {
 		return nil, fmt.Errorf("client is not initialized")
 	}
 
-	pager := conn.client.NewListContainersPager(nil)
+	pager := azClient.NewListContainersPager(nil)
 	_, err := pager.NextPage(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to azure blob: %w", err)
 	}
+
+	conn, err := filestorage.NewAzBlobClient(azClient, common.ConnectionProperties{
+		IsMainInstance: config.GetProperties().IsMainInstance,
+		SaveEncrypt:    config.GetProperties().SaveEncrypted,
+		SaveCompress:   config.GetProperties().SaveCompressed})
 
 	return conn, nil
 }
