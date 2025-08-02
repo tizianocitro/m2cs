@@ -8,23 +8,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"m2cs/internal/connection"
+	common "m2cs/pkg"
+	"m2cs/pkg/filestorage"
 	"os"
 )
 
-// S3Connection represents a connection to the AWS S3 service.
-type S3Connection struct {
-	client *s3.Client
-	connection.Properties
-}
-
-// GetClient returns the AWS S3 client.
-func (m *S3Connection) GetClient() *s3.Client {
-	return m.client
-}
-
-// CreateS3Connection creates a new S3Connection.
+// CreateS3Connection creates a new S3Client.
 // It returns an S3Connection or an error if the connection could not be established.
-func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegion string) (*S3Connection, error) {
+func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegion string) (*filestorage.S3Client, error) {
 	if endpoint == "default" {
 		endpoint = ""
 	}
@@ -33,7 +24,7 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 		awsRegion = "no-region"
 	}
 
-	conn := &S3Connection{}
+	var client *s3.Client = nil
 
 	switch config.GetConnectType() {
 	case "withCredential":
@@ -55,11 +46,11 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 		}
 
 		if endpoint == "" {
-			conn.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 				o.UsePathStyle = true
 			})
 		} else {
-			conn.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 				o.UsePathStyle = true
 				o.BaseEndpoint = aws.String(endpoint)
 			})
@@ -79,11 +70,11 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 		}
 
 		if endpoint == "" {
-			conn.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 				o.UsePathStyle = true
 			})
 		} else {
-			conn.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 				o.UsePathStyle = true
 				o.BaseEndpoint = aws.String(endpoint)
 			})
@@ -91,16 +82,19 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 	default:
 		return nil, fmt.Errorf("invalid connection type for AWS S3: %s", config.GetConnectType())
 	}
-	if conn.client == nil {
+	if client == nil {
 		return nil, fmt.Errorf("client is not initialized")
 	}
 
-	_, err := conn.client.ListBuckets(context.TODO(), nil)
+	_, err := client.ListBuckets(context.TODO(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to AWS S3: %w", err)
 	}
 
-	conn.Properties = config.GetProperties()
+	conn, err := filestorage.NewS3Client(client, common.ConnectionProperties{
+		IsMainInstance: config.GetProperties().IsMainInstance,
+		SaveEncrypt:    config.GetProperties().SaveEncrypted,
+		SaveCompress:   config.GetProperties().SaveCompressed})
 
 	return conn, nil
 }

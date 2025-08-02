@@ -77,7 +77,7 @@ func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (
 	return azBlobConn, nil
 }
 
-func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRegion string) (*connfilestorage.S3Connection, error) {
+func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRegion string) (*filestorage.S3Client, error) {
 	var authConfing *connection.AuthConfig = connectionOptions.ConnectionMethod
 	if authConfing == nil {
 		return nil, fmt.Errorf("connectionMethod cannot be nil")
