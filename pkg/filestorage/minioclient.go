@@ -1,11 +1,13 @@
 package filestorage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/minio/minio-go/v7"
 	"io"
 	common "m2cs/pkg"
+	"strings"
 )
 
 // MinioClient is a client for interacting with MinIO storage.
@@ -94,12 +96,24 @@ func (m *MinioClient) GetObject(ctx context.Context, storeBox string, fileName s
 
 // PutObject uploads an object to the specified bucket and file name in MinioClient.
 func (m *MinioClient) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
-	objectSize := getSizeFromReader(reader)
-	if objectSize == 0 {
-		return fmt.Errorf("fail to get the size from the reader")
+	var size int64
+
+	switch r := reader.(type) {
+	case *bytes.Reader:
+		size = int64(r.Len())
+	case *strings.Reader:
+		size = int64(r.Len())
+	case *bytes.Buffer:
+		size = int64(r.Len())
+	default:
+		size = getSizeFromReader(reader)
 	}
 
-	_, err := m.client.PutObject(context.Background(), storeBox, fileName, reader, objectSize, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	if size == 0 {
+		return fmt.Errorf("failed to determine size of input reader (type: %T)", reader)
+	}
+
+	_, err := m.client.PutObject(ctx, storeBox, fileName, reader, size, minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to put the object into minio bucket: %w", err)
 	}
@@ -124,27 +138,22 @@ func (m *MinioClient) RemoveObject(ctx context.Context, storeBox string, fileNam
 	return nil
 }
 
+func (m *MinioClient) GetConnectionProperties() common.ConnectionProperties {
+	return m.properties
+}
+
 func getSizeFromReader(reader io.Reader) int64 {
 	seeker, ok := reader.(io.Seeker)
 	if !ok {
 		return 0
 	}
-
-	currentPos, err := seeker.Seek(0, io.SeekCurrent)
+	end, err := seeker.Seek(0, io.SeekEnd)
 	if err != nil {
 		return 0
 	}
-
-	endPos, err := seeker.Seek(0, io.SeekEnd)
+	_, err = seeker.Seek(0, io.SeekStart)
 	if err != nil {
 		return 0
 	}
-
-	_, err = seeker.Seek(currentPos, io.SeekStart)
-	if err != nil {
-		return 0
-	}
-
-	size := endPos - currentPos
-	return size
+	return end
 }
