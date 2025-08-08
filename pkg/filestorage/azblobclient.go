@@ -95,6 +95,10 @@ func (a *AzBlobClient) RemoveObject(ctx context.Context, storeBox string, fileNa
 	return nil
 }
 
+func (a *AzBlobClient) GetConnectionProperties() common.ConnectionProperties {
+	return a.properties
+}
+
 func (a *AzBlobClient) ListObjects(ctx context.Context, storeBox string) ([]string, error) {
 	pager := a.client.NewListBlobsFlatPager(storeBox, &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},

@@ -12,7 +12,7 @@ import (
 // parameters:
 // - ConnectionMethod: The method used to establish the connection.
 // - IsMainInstance:Indicates if this is the main instance.
-// - SaveEncrypt:  Indicates if the data should be saved with encryption.
+// - SaveEncrypt: Indicates if the data should be saved with encryption.
 // - SaveCompress: Indicates if the data should be saved with compression.
 type ConnectionOptions struct {
 	ConnectionMethod connectionFunc
@@ -126,3 +126,13 @@ func ConnectWithConnectionString(connectionString string) connectionFunc {
 	authConfig.SetConnectionString(connectionString)
 	return authConfig
 }
+
+// ReplicationMode defines the replication modes for file storage.
+// SYNC_REPLICATION indicates that the replication is synchronous.
+// ASYNC_REPLICATION indicates that the replication is asynchronous.
+type ReplicationMode int
+
+const (
+	SYNC_REPLICATION ReplicationMode = iota
+	ASYNC_REPLICATION
+)

@@ -19,6 +19,10 @@ type S3Client struct {
 	properties common.ConnectionProperties
 }
 
+func (s *S3Client) GetConnectionProperties() common.ConnectionProperties {
+	return s.properties
+}
+
 func NewS3Client(client *s3.Client, properties common.ConnectionProperties) (*S3Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("failed to create S3Client: client is nil")
