@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"m2cs/pkg/filestorage"
+	"sync"
 )
 
 type FileClient struct {
@@ -192,6 +193,54 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox string, fileName st
 	}
 
 	return nil
+}
+
+// RemoveObject deletes an object from all main storages in parallel.
+// Errors are collected across storages and aggregated:
+//  - If all storages fail, the function returns a consolidated error.
+//  - If some storages fail, a partial error is returned with details.
+//  - If no errors occur, the function returns nil.
+func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName string) error {
+	var errs []error
+
+	var mainStorages []filestorage.FileStorage
+
+	for _, storage := range f.storages {
+		if storage.GetConnectionProperties().IsMainInstance {
+			mainStorages = append(mainStorages, storage)
+		}
+	}
+
+	if len(mainStorages) == 0 {
+		return errors.New("no main instance found for RemoveObject operation")
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for _, storage := range mainStorages {
+		wg.Add(1)
+		go func(s filestorage.FileStorage) {
+			defer wg.Done()
+			if err := s.RemoveObject(ctx, storeBox, fileName); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("RemoveObject failed on storage %T: %w", s, err))
+				mu.Unlock()
+			}
+		}(storage)
+	}
+
+	wg.Wait()
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	if len(errs) == len(mainStorages) {
+		return fmt.Errorf("RemoveObject failed on all main storages: %w", errors.Join(errs...))
+	}
+
+	return fmt.Errorf("RemoveObject partially failed on %d/%d storages: %w", len(errs), len(f.storages), errors.Join(errs...))
 }
 
 func compressReader(input io.Reader) (io.ReadCloser, error) {
