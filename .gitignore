@@ -26,3 +26,4 @@ go.work.sum
 
 docker-compose.yml
 main.go
+*.DS_Store

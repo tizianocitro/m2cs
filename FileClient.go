@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"m2cs/pkg/filestorage"
 )
 
@@ -46,52 +47,151 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox string, fileName st
 
 	var errs []error
 
-	for _, storage := range mainStorages {
-		raw := bytes.NewReader(buf)
-		var obj io.Reader = raw
-		var toClose []io.Closer
+	if f.replicationMode == SYNC_REPLICATION {
+		for _, storage := range mainStorages {
+			raw := bytes.NewReader(buf)
+			var obj io.Reader = raw
+			var toClose []io.Closer
 
-		props := storage.GetConnectionProperties()
+			props := storage.GetConnectionProperties()
 
-		// Optional compression
-		if props.SaveCompress {
-			compressed, err := compressReader(obj)
+			// Optional compression
+			if props.SaveCompress {
+				compressed, err := compressReader(obj)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("compression failed on storage %T: %w", storage, err))
+					continue
+				}
+				toClose = append(toClose, compressed)
+				obj = compressed
+			}
+
+			// Optional encryption
+			if props.SaveEncrypt {
+				encrypted, err := encryptReader("key", obj)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("encryption failed on storage %T: %w", storage, err))
+					continue
+				}
+				obj = encrypted
+			}
+
+			if err := storage.PutObject(ctx, storeBox, fileName, obj); err != nil {
+				errs = append(errs, fmt.Errorf("PutObject failed on storage %T: %w", storage, err))
+			}
+
+			for _, closer := range toClose {
+				_ = closer.Close()
+			}
+		}
+
+		if len(errs) == 0 {
+			return nil
+		}
+
+		if len(errs) == len(mainStorages) {
+			return fmt.Errorf("PutObject failed on all storages: %w", errors.Join(errs...))
+		}
+
+		return fmt.Errorf("PutObject partially failed on %d/%d storages: %w", len(errs), len(mainStorages), errors.Join(errs...))
+	}
+	if f.replicationMode == ASYNC_REPLICATION {
+		var successfulStorage filestorage.FileStorage
+		var success bool
+
+		// Try to put the object on the first available main storage
+		for _, storage := range mainStorages {
+			raw := bytes.NewReader(buf)
+			var obj io.Reader = raw
+			var toClose []io.Closer
+
+			props := storage.GetConnectionProperties()
+
+			// Optional compression
+			if props.SaveCompress {
+				compressed, err := compressReader(obj)
+				if err != nil {
+					continue
+				}
+				toClose = append(toClose, compressed)
+				obj = compressed
+			}
+
+			// Optional encryption
+			if props.SaveEncrypt {
+				encrypted, err := encryptReader("key", obj)
+				if err != nil {
+					continue
+				}
+				obj = encrypted
+			}
+
+			err := storage.PutObject(ctx, storeBox, fileName, obj)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("compression failed on storage %T: %w", storage, err))
 				continue
 			}
-			toClose = append(toClose, compressed)
-			obj = compressed
+
+			successfulStorage = storage
+			success = true
+
+			for _, c := range toClose {
+				_ = c.Close()
+			}
+			break
 		}
 
-		// Optional encryption
-		if props.SaveEncrypt {
-			encrypted, err := encryptReader("key", obj)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("encryption failed on storage %T: %w", storage, err))
+		if !success {
+			return fmt.Errorf("PutObject failed on all main storages")
+		}
+
+		// Launch async operations on remaining storages
+		for _, storage := range mainStorages {
+			if storage == successfulStorage {
 				continue
 			}
-			obj = encrypted
-		}
 
-		if err := storage.PutObject(ctx, storeBox, fileName, obj); err != nil {
-			errs = append(errs, fmt.Errorf("PutObject failed on storage %T: %w", storage, err))
-		}
+			go func(s filestorage.FileStorage) {
+				raw := bytes.NewReader(buf)
+				var obj io.Reader = raw
+				var toClose []io.Closer
 
-		for _, closer := range toClose {
-			_ = closer.Close()
+				props := s.GetConnectionProperties()
+
+				// Optional compression
+				if props.SaveCompress {
+					compressed, err := compressReader(obj)
+					if err != nil {
+						log.Printf("[async] compression failed on storage %T: %v", s, err)
+						return
+					}
+					toClose = append(toClose, compressed)
+					obj = compressed
+				}
+
+				// Optional encryption
+				if props.SaveEncrypt {
+					encrypted, err := encryptReader("key", obj)
+					if err != nil {
+						log.Printf("[async] encryption failed on storage %T: %v", s, err)
+						return
+					}
+					obj = encrypted
+				}
+
+				localCtx := context.Background()
+
+				if err := s.PutObject(localCtx, storeBox, fileName, obj); err != nil {
+					log.Printf("[async] PutObject failed on %T: %v", s, err)
+				}
+
+				for _, c := range toClose {
+					_ = c.Close()
+				}
+			}(storage)
 		}
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-
-	if len(errs) == len(mainStorages) {
-		return fmt.Errorf("PutObject failed on all storages: %w", errors.Join(errs...))
-	}
-
-	return fmt.Errorf("PutObject partially failed on %d/%d storages: %w", len(errs), len(mainStorages), errors.Join(errs...))
+	return nil
 }
 
 func compressReader(input io.Reader) (io.ReadCloser, error) {
