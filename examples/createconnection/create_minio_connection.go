@@ -18,8 +18,8 @@ func main() {
 	conn, err := m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithCredentials(accessKeyID, secretAccessKey),
 		IsMainInstance:   true,
-		SaveEncrypt:      false,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.GZIP_COMPRESSION,
 	}, &minio.Options{
 		Secure: useSSL,
 	})
@@ -35,8 +35,8 @@ func main() {
 	conn, err = m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 		IsMainInstance:   false,
-		SaveEncrypt:      true,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.NO_COMPRESSION,
 	}, &minio.Options{
 		Secure: useSSL,
 	})
@@ -51,8 +51,8 @@ func main() {
 	conn, err = m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithCredentials(accessKeyID, secretAccessKey),
 		IsMainInstance:   true,
-		SaveEncrypt:      false,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.GZIP_COMPRESSION,
 	}, nil)
 }
 

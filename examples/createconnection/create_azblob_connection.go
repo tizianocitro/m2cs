@@ -12,8 +12,8 @@ func main() {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithCredentials("accountName", "secretKey"),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     false})
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.GZIP_COMPRESSION})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -28,8 +28,8 @@ func main() {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     false})
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -42,8 +42,8 @@ func main() {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithConnectionString("yourConnectionString"),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     false})
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION})
 	if err != nil {
 		log.Fatalln(err)
 	}

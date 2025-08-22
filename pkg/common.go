@@ -6,6 +6,26 @@ package common
 // SaveCompress indicates if data should be saved in a compressed format.
 type ConnectionProperties struct {
 	IsMainInstance bool
-	SaveEncrypt    bool
-	SaveCompress   bool
+	SaveEncrypt    EncryptionAlgorithm
+	SaveCompress   CompressionAlgorithm
+}
+
+type CompressionAlgorithm int
+
+const (
+	NO_COMPRESSION CompressionAlgorithm = iota
+	GZIP_COMPRESSION
+)
+
+type EncryptionAlgorithm int
+
+const (
+	NO_ENCRYPTION EncryptionAlgorithm = iota
+	AES256_ENCRYPTION
+)
+
+type Properties struct {
+	IsMainInstance bool
+	SaveEncrypted  EncryptionAlgorithm
+	SaveCompressed CompressionAlgorithm
 }

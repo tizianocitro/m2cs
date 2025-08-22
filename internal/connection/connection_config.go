@@ -1,17 +1,15 @@
 package connection
 
+import (
+	common "m2cs/pkg"
+)
+
 type AuthConfig struct {
 	connectType          string
 	accessKey            string
 	secretKey            string
 	connectionString     string
-	connectionProperties Properties
-}
-
-type Properties struct {
-	IsMainInstance bool
-	SaveEncrypted  bool
-	SaveCompressed bool
+	connectionProperties common.Properties
 }
 
 func NewAuthConfig() *AuthConfig {
@@ -50,10 +48,10 @@ func (a *AuthConfig) SetConnectionString(connectionString string) {
 	a.connectionString = connectionString
 }
 
-func (a *AuthConfig) GetProperties() Properties {
+func (a *AuthConfig) GetProperties() common.Properties {
 	return a.connectionProperties
 }
 
-func (a *AuthConfig) SetProperties(properties Properties) {
+func (a *AuthConfig) SetProperties(properties common.Properties) {
 	a.connectionProperties = properties
 }

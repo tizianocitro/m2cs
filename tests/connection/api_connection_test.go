@@ -101,15 +101,15 @@ func TestNewAzBlobConnection_WithCredentials_Success(t *testing.T) {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithCredentials(azurite.AccountName, azurite.AccountKey),
 			IsMainInstance:   true,
-			SaveEncrypt:      true,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
 		})
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.True(t, conn.IsMainInstance)
-	assert.True(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.True(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.NO_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
+	assert.IsType(t, m2cs.GZIP_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
 
 	pager := conn.GetClient().NewListContainersPager(&azblob.ListContainersOptions{
 		Include: azblob.ListContainersInclude{Metadata: true},
@@ -151,15 +151,15 @@ func TestNewAzBlobConnection_WithEnvCredentials_Success(t *testing.T) {
 		azuriteEndpoint,
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
-			SaveEncrypt:      false,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
 		})
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.False(t, conn.IsMainInstance)
-	assert.False(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.False(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.NO_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
+	assert.IsType(t, m2cs.NO_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
 
 	pager := conn.GetClient().NewListContainersPager(&azblob.ListContainersOptions{
 		Include: azblob.ListContainersInclude{Metadata: true},
@@ -192,15 +192,15 @@ func TestNewAzBlobConnection_WithConnectionString_Success(t *testing.T) {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
 		})
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.True(t, conn.IsMainInstance)
-	assert.False(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.True(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.AES256_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
+	assert.IsType(t, m2cs.NO_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
 
 	pager := conn.GetClient().NewListContainersPager(&azblob.ListContainersOptions{
 		Include: azblob.ListContainersInclude{Metadata: true},
@@ -254,16 +254,16 @@ func TestNewMinIOConnection_ConnectionMethod_InvalidConnectionMethod(t *testing.
 func TestNewMinIOConnection_WithCredentials_Success(t *testing.T) {
 	conn, err := m2cs.NewMinIOConnection(minioEndpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
-		IsMainInstance:   true,
-		SaveEncrypt:      false,
-		SaveCompress:     true,
+		IsMainInstance:   false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.NO_COMPRESSION,
 	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.True(t, conn.IsMainInstance)
-	assert.False(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.False(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.NO_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
+	assert.IsType(t, m2cs.NO_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
 
 	exist, err := conn.GetClient().BucketExists(context.Background(), "test-bucket")
 	require.NoError(t, err)
@@ -286,15 +286,15 @@ func TestNewMinioConnection_WithEnvCredentials_Success(t *testing.T) {
 	conn, err := m2cs.NewMinIOConnection(minioEndpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 		IsMainInstance:   false,
-		SaveEncrypt:      true,
-		SaveCompress:     true,
+		SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+		SaveCompress:     m2cs.GZIP_COMPRESSION,
 	}, &minio.Options{Region: "no-region"})
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.False(t, conn.IsMainInstance)
-	assert.True(t, conn.SaveCompressed)
-	assert.True(t, conn.SaveEncrypted)
+	assert.False(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.AES256_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
+	assert.IsType(t, m2cs.GZIP_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
 
 	exist, err := conn.GetClient().BucketExists(context.Background(), "test-bucket")
 	require.NoError(t, err)
@@ -335,16 +335,16 @@ func TestNewS3Connection_WithCredentials_Success(t *testing.T) {
 		localstackEndpoint,
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithCredentials("accesskey", "secretkey"),
-			IsMainInstance:   true,
-			SaveEncrypt:      true,
-			SaveCompress:     true,
+			IsMainInstance:   false,
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
 		}, awsRegion)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.True(t, conn.IsMainInstance)
-	assert.True(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.False(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.NO_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
+	assert.IsType(t, m2cs.NO_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
 
 	client := conn.GetClient()
 	bucketList, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
@@ -378,15 +378,15 @@ func TestNewS3Connection_WithEnvCredentials_Success(t *testing.T) {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 			IsMainInstance:   true,
-			SaveEncrypt:      true,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
 		}, "")
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	assert.True(t, conn.IsMainInstance)
-	assert.True(t, conn.SaveEncrypted)
-	assert.True(t, conn.SaveCompressed)
+	assert.True(t, conn.GetConnectionProperties().IsMainInstance)
+	assert.IsType(t, m2cs.AES256_ENCRYPTION, conn.GetConnectionProperties().SaveEncrypt)
+	assert.IsType(t, m2cs.GZIP_COMPRESSION, conn.GetConnectionProperties().SaveCompress)
 
 	client := conn.GetClient()
 	bucketList, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})

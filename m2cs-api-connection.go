@@ -5,6 +5,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"m2cs/internal/connection"
 	connfilestorage "m2cs/internal/connection/filestorage"
+	common "m2cs/pkg"
 	"m2cs/pkg/filestorage"
 )
 
@@ -17,8 +18,8 @@ import (
 type ConnectionOptions struct {
 	ConnectionMethod connectionFunc
 	IsMainInstance   bool
-	SaveEncrypt      bool
-	SaveCompress     bool
+	SaveEncrypt      EncryptionAlgorithm
+	SaveCompress     CompressionAlgorithm
 }
 
 type connectionFunc *connection.AuthConfig
@@ -36,7 +37,7 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 		return nil, fmt.Errorf("invalid connection method for MinIO; use: ConnectWithCredentials or ConnectWithEnvCredentials")
 	}
 
-	authConfing.SetProperties(connection.Properties{
+	authConfing.SetProperties(common.Properties{
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
@@ -63,7 +64,7 @@ func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (
 			"use: ConnectWithCredentials, ConnectWithEnvCredentials or ConnectWithConnectionString")
 	}
 
-	authConfing.SetProperties(connection.Properties{
+	authConfing.SetProperties(common.Properties{
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
@@ -89,7 +90,7 @@ func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRe
 			"use: ConnectWithCredentials or ConnectWithEnvCredentials")
 	}
 
-	authConfing.SetProperties(connection.Properties{
+	authConfing.SetProperties(common.Properties{
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
@@ -135,4 +136,17 @@ type ReplicationMode int
 const (
 	SYNC_REPLICATION ReplicationMode = iota
 	ASYNC_REPLICATION
+)
+
+// Re-export types (type alias)
+type CompressionAlgorithm = common.CompressionAlgorithm
+type EncryptionAlgorithm = common.EncryptionAlgorithm
+
+// Re-export constants
+const (
+	NO_COMPRESSION   = common.NO_COMPRESSION
+	GZIP_COMPRESSION = common.GZIP_COMPRESSION
+
+	NO_ENCRYPTION     = common.NO_ENCRYPTION
+	AES256_ENCRYPTION = common.AES256_ENCRYPTION
 )

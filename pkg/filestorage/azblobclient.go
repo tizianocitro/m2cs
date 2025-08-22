@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"io"
-
 	common "m2cs/pkg"
 )
 
@@ -29,6 +28,10 @@ func NewAzBlobClient(client *azblob.Client, properties common.ConnectionProperti
 		client:     client,
 		properties: properties,
 	}, nil
+}
+
+func (a *AzBlobClient) GetClient() *azblob.Client {
+	return a.client
 }
 
 func (a *AzBlobClient) CreateContainer(ctx context.Context, containerName string) error {

@@ -39,6 +39,10 @@ func NewS3Client(client *s3.Client, properties common.ConnectionProperties) (*S3
 	}, nil
 }
 
+func (s *S3Client) GetClient() *s3.Client {
+	return s.client
+}
+
 func (s *S3Client) CreateBucket(ctx context.Context, bucketName string) error {
 	_, err := s.client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucketName)})

@@ -37,6 +37,11 @@ func NewMinioClient(client *minio.Client, properties common.ConnectionProperties
 	}, nil
 }
 
+// GetClient returns the underlying MinIO client.
+func (m *MinioClient) GetClient() *minio.Client {
+	return m.client
+}
+
 // MakeBucket creates a new bucket in MinioClient.
 func (m *MinioClient) MakeBucket(ctx context.Context, bucketName string) error {
 	if m.client == nil {

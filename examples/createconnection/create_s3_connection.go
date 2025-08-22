@@ -12,8 +12,8 @@ func main() {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithCredentials("accessKeyId", "secretKeyId"),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
 		},
 		"") // "" is equivalent to "no-region"
 	if err != nil {
@@ -30,8 +30,8 @@ func main() {
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 			IsMainInstance:   true,
-			SaveEncrypt:      false,
-			SaveCompress:     true,
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
 		},
 		"us-east-1")
 	if err != nil {
