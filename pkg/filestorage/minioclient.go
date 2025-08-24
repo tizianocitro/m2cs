@@ -7,6 +7,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"io"
 	common "m2cs/pkg"
+	"m2cs/pkg/transform"
 	"strings"
 )
 
@@ -103,22 +104,27 @@ func (m *MinioClient) GetObject(ctx context.Context, storeBox string, fileName s
 func (m *MinioClient) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
 	var size int64
 
-	switch r := reader.(type) {
-	case *bytes.Reader:
-		size = int64(r.Len())
-	case *strings.Reader:
-		size = int64(r.Len())
-	case *bytes.Buffer:
-		size = int64(r.Len())
-	default:
-		size = getSizeFromReader(reader)
+	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(m.properties, m.properties.EncryptKey)
+	if err != nil {
+		return fmt.Errorf("build write pipeline: %w", err)
 	}
+
+	obj, closer, err := pipe.Apply(reader)
+	if err != nil {
+		return fmt.Errorf("apply write pipeline: %w", err)
+	}
+
+	if closer != nil {
+		defer closer.Close()
+	}
+
+	obj, size, err = getSizeFromReader(obj)
 
 	if size == 0 {
 		return fmt.Errorf("failed to determine size of input reader (type: %T)", reader)
 	}
 
-	_, err := m.client.PutObject(ctx, storeBox, fileName, reader, size, minio.PutObjectOptions{})
+	_, err = m.client.PutObject(ctx, storeBox, fileName, obj, size, minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to put the object into minio bucket: %w", err)
 	}
@@ -147,18 +153,45 @@ func (m *MinioClient) GetConnectionProperties() common.ConnectionProperties {
 	return m.properties
 }
 
-func getSizeFromReader(reader io.Reader) int64 {
-	seeker, ok := reader.(io.Seeker)
-	if !ok {
-		return 0
+// getSizeFromReader ensures that the reader has a known size.
+// If the reader is seekable or supports Len(), it reuses it.
+// Otherwise it materializes into memory and returns a *bytes.Reader.
+func getSizeFromReader(r io.Reader) (io.Reader, int64, error) {
+	switch v := r.(type) {
+	case *bytes.Reader:
+		return v, int64(v.Len()), nil
+	case *bytes.Buffer:
+		return v, int64(v.Len()), nil
+	case *strings.Reader:
+		return v, int64(v.Len()), nil
 	}
-	end, err := seeker.Seek(0, io.SeekEnd)
+
+	if seeker, ok := r.(io.Seeker); ok {
+
+		cur, _ := seeker.Seek(0, io.SeekCurrent)
+
+		end, err := seeker.Seek(0, io.SeekEnd)
+		if err != nil {
+			return nil, 0, fmt.Errorf("getSizeFromReader: seek end: %w", err)
+		}
+
+		if _, err := seeker.Seek(cur, io.SeekStart); err != nil {
+			return nil, 0, fmt.Errorf("getSizeFromReader: rewind: %w", err)
+		}
+
+		if cur != 0 {
+			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+				return nil, 0, fmt.Errorf("getSizeFromReader: seek start: %w", err)
+			}
+		}
+		return r, end, nil
+	}
+
+	buf, err := io.ReadAll(r)
 	if err != nil {
-		return 0
+		return nil, 0, fmt.Errorf("getSizeFromReader: materialize: %w", err)
 	}
-	_, err = seeker.Seek(0, io.SeekStart)
-	if err != nil {
-		return 0
-	}
-	return end
+	br := bytes.NewReader(buf)
+
+	return br, int64(len(buf)), nil
 }

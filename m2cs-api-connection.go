@@ -15,11 +15,13 @@ import (
 // - IsMainInstance:Indicates if this is the main instance.
 // - SaveEncrypt: Indicates if the data should be saved with encryption.
 // - SaveCompress: Indicates if the data should be saved with compression.
+// - CompressKey: Optional key for encrypt , if needed.
 type ConnectionOptions struct {
 	ConnectionMethod connectionFunc
 	IsMainInstance   bool
 	SaveEncrypt      EncryptionAlgorithm
 	SaveCompress     CompressionAlgorithm
+	EncryptKey       string // Optional key for encrypt , if needed
 }
 
 type connectionFunc *connection.AuthConfig
@@ -41,7 +43,7 @@ func NewMinIOConnection(endpoint string, connectionOptions ConnectionOptions, mi
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
-	})
+		EncryptKey:     connectionOptions.EncryptKey})
 
 	minioConn, err := connfilestorage.CreateMinioConnection(endpoint, authConfing, minioOptions)
 	if err != nil {
@@ -68,7 +70,7 @@ func NewAzBlobConnection(endpoint string, connectionOptions ConnectionOptions) (
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
-	})
+		EncryptKey:     connectionOptions.EncryptKey})
 
 	azBlobConn, err := connfilestorage.CreateAzBlobConnection(endpoint, authConfing)
 	if err != nil {
@@ -94,7 +96,7 @@ func NewS3Connection(endpoint string, connectionOptions ConnectionOptions, awsRe
 		IsMainInstance: connectionOptions.IsMainInstance,
 		SaveEncrypted:  connectionOptions.SaveEncrypt,
 		SaveCompressed: connectionOptions.SaveCompress,
-	})
+		EncryptKey:     connectionOptions.EncryptKey})
 
 	s3Conn, err := connfilestorage.CreateS3Connection(endpoint, authConfing, awsRegion)
 	if err != nil {

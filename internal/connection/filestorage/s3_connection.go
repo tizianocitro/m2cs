@@ -94,7 +94,8 @@ func CreateS3Connection(endpoint string, config *connection.AuthConfig, awsRegio
 	conn, err := filestorage.NewS3Client(client, common.ConnectionProperties{
 		IsMainInstance: config.GetProperties().IsMainInstance,
 		SaveEncrypt:    config.GetProperties().SaveEncrypted,
-		SaveCompress:   config.GetProperties().SaveCompressed})
+		SaveCompress:   config.GetProperties().SaveCompressed,
+		EncryptKey:     config.GetProperties().EncryptKey})
 
 	return conn, nil
 }

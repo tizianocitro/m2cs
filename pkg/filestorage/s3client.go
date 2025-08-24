@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	common "m2cs/pkg"
+	"m2cs/pkg/transform"
 	"time"
 )
 
@@ -137,11 +138,24 @@ func (s *S3Client) GetObject(ctx context.Context, storeBox string, fileName stri
 }
 
 func (s *S3Client) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
+	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(s.properties, s.properties.EncryptKey)
+	if err != nil {
+		return fmt.Errorf("build write pipeline: %w", err)
+	}
 
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+	obj, closer, err := pipe.Apply(reader)
+	if err != nil {
+		return fmt.Errorf("apply write pipeline: %w", err)
+	}
+
+	if closer != nil {
+		defer closer.Close()
+	}
+
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(storeBox),
 		Key:    aws.String(fileName),
-		Body:   reader,
+		Body:   obj,
 	})
 	if err != nil {
 		var apiErr smithy.APIError

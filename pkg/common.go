@@ -8,6 +8,7 @@ type ConnectionProperties struct {
 	IsMainInstance bool
 	SaveEncrypt    EncryptionAlgorithm
 	SaveCompress   CompressionAlgorithm
+	EncryptKey     string // Optional key for encryption, if needed
 }
 
 type CompressionAlgorithm int
@@ -28,4 +29,5 @@ type Properties struct {
 	IsMainInstance bool
 	SaveEncrypted  EncryptionAlgorithm
 	SaveCompressed CompressionAlgorithm
+	EncryptKey     string // Optional key for encryption, if needed
 }

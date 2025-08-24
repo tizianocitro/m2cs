@@ -6,29 +6,33 @@ import (
 	"io"
 )
 
-// CompressGzip compresses the input data using gzip and returns a reader for the compressed data.
-func CompressGzip(r io.Reader) (io.Reader, error) {
+type GzipCompress struct{}
+
+func (g *GzipCompress) Name() string { return "gzip" }
+
+func (g *GzipCompress) Apply(reader io.Reader) (io.Reader, io.Closer, error) {
 	pr, pw := io.Pipe()
 	gw := gzip.NewWriter(pw)
-
 	go func() {
 		defer gw.Close()
-		_, err := io.Copy(gw, r)
-		if err != nil {
-			pw.CloseWithError(fmt.Errorf("compression failed: %w", err))
-			return
+		defer pw.Close()
+		if _, err := io.Copy(gw, reader); err != nil {
+			_ = pw.CloseWithError(fmt.Errorf("gzip: %w", err))
 		}
-		pw.Close()
 	}()
-
-	return pr, nil
+	return pr, pr, nil
 }
 
-// DecompressGzip decompresses the input gzip-compressed data and returns a reader for the decompressed data.
-func DecompressGzip(r io.Reader) (io.Reader, error) {
-	gr, err := gzip.NewReader(r)
+type GzipDecompress struct{}
+
+func (GzipDecompress) Name() string { return "gzip-decompress" }
+
+func (GzipDecompress) Apply(readerCloser io.ReadCloser) (io.ReadCloser, error) {
+	gr, err := gzip.NewReader(readerCloser)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		_ = readerCloser.Close()
+		return nil, fmt.Errorf("gzip: %w", err)
 	}
+
 	return gr, nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"io"
 	common "m2cs/pkg"
+	"m2cs/pkg/transform"
 )
 
 type AzBlobClient struct {
@@ -81,10 +82,24 @@ func (a *AzBlobClient) GetObject(ctx context.Context, storeBox string, fileName 
 	return retryReader, nil
 }
 
-func (a *AzBlobClient) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
-	_, err := a.client.UploadStream(context.TODO(), storeBox, fileName, reader, nil)
+func (a *AzBlobClient) PutObject(ctx context.Context, storeBox, fileName string, reader io.Reader) error {
+	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(a.properties, a.properties.EncryptKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("build write pipeline: %w", err)
+	}
+
+	obj, closer, err := pipe.Apply(reader)
+	if err != nil {
+		return fmt.Errorf("apply write pipeline: %w", err)
+	}
+
+	if closer != nil {
+		defer closer.Close()
+	}
+
+	_, err = a.client.UploadStream(ctx, storeBox, fileName, obj, nil)
+	if err != nil {
+		return fmt.Errorf("azure upload stream: %w", err)
 	}
 
 	return nil
