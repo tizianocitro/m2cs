@@ -1,6 +1,7 @@
 package compression
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -8,19 +9,21 @@ import (
 
 type GzipCompress struct{}
 
-func (g *GzipCompress) Name() string { return "gzip" }
+func (*GzipCompress) Name() string { return "gzip-compress" }
 
-func (g *GzipCompress) Apply(reader io.Reader) (io.Reader, io.Closer, error) {
-	pr, pw := io.Pipe()
-	gw := gzip.NewWriter(pw)
-	go func() {
-		defer gw.Close()
-		defer pw.Close()
-		if _, err := io.Copy(gw, reader); err != nil {
-			_ = pw.CloseWithError(fmt.Errorf("gzip: %w", err))
-		}
-	}()
-	return pr, pr, nil
+func (*GzipCompress) Apply(r io.Reader) (io.Reader, io.Closer, error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	if _, err := io.Copy(zw, r); err != nil {
+		_ = zw.Close()
+		return nil, nil, fmt.Errorf("gzip: copy: %w", err)
+	}
+	if err := zw.Close(); err != nil {
+		return nil, nil, fmt.Errorf("gzip: close: %w", err)
+	}
+
+	return bytes.NewReader(buf.Bytes()), io.NopCloser(nil), nil
 }
 
 type GzipDecompress struct{}

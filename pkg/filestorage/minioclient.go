@@ -92,12 +92,22 @@ func (m *MinioClient) RemoveBucket(ctx context.Context, bucketName string) error
 
 // GetObject retrieves an object from the specified bucket and file name in MinioClient.
 func (m *MinioClient) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
+	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(m.properties, m.properties.EncryptKey)
+	if err != nil {
+		return nil, fmt.Errorf("build read pipeline: %w", err)
+	}
+
 	object, err := m.client.GetObject(context.Background(), storeBox, fileName, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the object from MinIO client: %w", err)
 	}
 
-	return object, nil
+	obj, err := pipe.Apply(object)
+	if err != nil {
+		return nil, fmt.Errorf("fail to transform reader: %w", err)
+	}
+
+	return obj, nil
 }
 
 // PutObject uploads an object to the specified bucket and file name in MinioClient.

@@ -73,13 +73,24 @@ func (a *AzBlobClient) ListContainers() ([]string, error) {
 }
 
 func (a *AzBlobClient) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
+	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(a.properties, a.properties.EncryptKey)
+	if err != nil {
+		return nil, fmt.Errorf("build read pipeline: %w", err)
+	}
+
 	get, err := a.client.DownloadStream(ctx, storeBox, fileName, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	retryReader := get.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
-	return retryReader, nil
+
+	obj, err := pipe.Apply(retryReader)
+	if err != nil {
+		return nil, fmt.Errorf("fail to transform reader: %w", err)
+	}
+
+	return obj, nil
 }
 
 func (a *AzBlobClient) PutObject(ctx context.Context, storeBox, fileName string, reader io.Reader) error {

@@ -106,3 +106,32 @@ func (Factory) BuildWPipelineCompressEncrypt(props common.ConnectionProperties, 
 
 	return NewWritePipeline(steps...), nil
 }
+
+func (Factory) BuildRPipelineDecryptDecompress(props common.ConnectionProperties, decryptionKey string) (ReadPipeline, error) {
+	var steps []ReaderTransform
+
+	// 1) Decryption
+	switch props.SaveEncrypt {
+	case common.NO_ENCRYPTION:
+		// no-op
+	case common.AES256_ENCRYPTION:
+		if decryptionKey == "" {
+			return ReadPipeline{}, fmt.Errorf("missing decryption key for AES256_ENCRYPTION")
+		}
+		steps = append(steps, &encryption.AESGCMDecrypt{Key: decryptionKey})
+	default:
+		return ReadPipeline{}, fmt.Errorf("unsupported encryption algorithm: %v", props.SaveEncrypt)
+	}
+
+	// 2) Decompression
+	switch props.SaveCompress {
+	case common.NO_COMPRESSION:
+		// no-op
+	case common.GZIP_COMPRESSION:
+		steps = append(steps, &compression.GzipDecompress{})
+	default:
+		return ReadPipeline{}, fmt.Errorf("unsupported compression algorithm: %v", props.SaveCompress)
+	}
+
+	return NewReadPipeline(steps...), nil
+}

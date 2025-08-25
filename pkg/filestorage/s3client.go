@@ -119,6 +119,11 @@ func (s *S3Client) RemoveBucket(ctx context.Context, bucketName string) error {
 }
 
 func (s *S3Client) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
+	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(s.properties, s.properties.EncryptKey)
+	if err != nil {
+		return nil, fmt.Errorf("build read pipeline: %w", err)
+	}
+
 	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(storeBox),
 		Key:    aws.String(fileName),
@@ -134,7 +139,13 @@ func (s *S3Client) GetObject(ctx context.Context, storeBox string, fileName stri
 		return nil, err
 	}
 
-	return result.Body, err
+	obj, err := pipe.Apply(result.Body)
+	if err != nil {
+		_ = result.Body.Close()
+		return nil, fmt.Errorf("apply read pipeline: %w", err)
+	}
+
+	return obj, err
 }
 
 func (s *S3Client) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
