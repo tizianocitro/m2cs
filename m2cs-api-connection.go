@@ -152,3 +152,10 @@ const (
 	NO_ENCRYPTION     = common.NO_ENCRYPTION
 	AES256_ENCRYPTION = common.AES256_ENCRYPTION
 )
+
+type LoadBalancingStrategy int
+
+const (
+	CLASSIC LoadBalancingStrategy = iota
+	ROUND_ROBIN
+)

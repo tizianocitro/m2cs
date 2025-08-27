@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"m2cs/internal/loadbalancing"
 	"m2cs/pkg/filestorage"
 	"sync"
 )
@@ -14,12 +15,15 @@ import (
 type FileClient struct {
 	storages        []filestorage.FileStorage
 	replicationMode ReplicationMode
+	lbStrategy      LoadBalancingStrategy
+	lb              loadbalancing.LoadBalancer
 }
 
-func NewFileClient(replicationMode ReplicationMode, storages ...filestorage.FileStorage) *FileClient {
+func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBalancingStrategy, storages ...filestorage.FileStorage) *FileClient {
 	return &FileClient{
 		storages:        storages,
 		replicationMode: replicationMode,
+		lbStrategy:      loadBalacingStrategy,
 	}
 }
 
@@ -91,6 +95,62 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 	}
 }
 
+func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (io.ReadCloser, error) {
+	var obj io.ReadCloser
+	var mainStorages []filestorage.FileStorage
+	var nonMainStorages []filestorage.FileStorage
+
+	for _, storage := range f.storages {
+		if storage.GetConnectionProperties().IsMainInstance {
+			mainStorages = append(mainStorages, storage)
+		} else {
+			nonMainStorages = append(nonMainStorages, storage)
+		}
+	}
+
+	var groups []loadbalancing.ClientGroup
+
+	if len(nonMainStorages) > 0 {
+		groups = append(groups, loadbalancing.ClientGroup{
+			Clients: toLB(nonMainStorages),
+		})
+	}
+	if len(mainStorages) > 0 {
+		groups = append(groups, loadbalancing.ClientGroup{
+			Clients: toLB(mainStorages),
+		})
+	}
+
+	var err error
+
+	if f.lb == nil {
+		log.Printf("sono qui")
+		var strategy loadbalancing.Strategy
+		switch f.lbStrategy {
+		case CLASSIC:
+			strategy = loadbalancing.CLASSIC
+		case ROUND_ROBIN:
+			strategy = loadbalancing.ROUND_ROBIN
+		default:
+			return nil, fmt.Errorf("unsupported load balancing strategy: %v", f.lbStrategy)
+		}
+
+		f.lb, err = loadbalancing.Factory{}.NewLoadBalancer(strategy, groups)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create load balancer: %w", err)
+		}
+
+	}
+
+	obj, err = f.lb.Apply(ctx, storeBox, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("FileClient GetObject error: %w", err)
+	}
+
+	return obj, nil
+
+}
+
 // RemoveObject deletes an object from all main storages in parallel.
 // Errors are collected across storages and aggregated:
 //   - If all storages fail, the function returns a consolidated error.
@@ -137,4 +197,12 @@ func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName
 	}
 
 	return fmt.Errorf("RemoveObject partially failed on %d/%d storages: %w", len(errs), len(f.storages), errors.Join(errs...))
+}
+
+func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
+	var clients []loadbalancing.Client
+	for _, s := range storages {
+		clients = append(clients, s)
+	}
+	return clients
 }
