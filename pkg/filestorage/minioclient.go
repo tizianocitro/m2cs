@@ -133,11 +133,7 @@ func (m *MinioClient) PutObject(ctx context.Context, storeBox string, fileName s
 	}
 
 	obj, size, err = getSizeFromReader(obj)
-
-	if size == 0 {
-		return fmt.Errorf("failed to determine size of input reader (type: %T)", reader)
-	}
-
+	
 	_, err = m.client.PutObject(ctx, storeBox, fileName, obj, size, minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to put the object into minio bucket: %w", err)
