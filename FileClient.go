@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"m2cs/internal/loadbalancing"
+	common "m2cs/pkg"
 	"m2cs/pkg/filestorage"
 	"sync"
 )
@@ -32,6 +33,10 @@ func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBal
 // the write to other main storages in the background.
 // In SYNC_REPLICATION mode, it writes to all main storages and collects errors.
 func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, reader io.Reader) error {
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
+
 	buf, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("failed to read input stream: %w", err)
@@ -60,7 +65,7 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 			}
 		}
 		if !oneSuccess {
-			return fmt.Errorf("[async] PutObject failed on all  main storages")
+			return fmt.Errorf("[async] PutObject failed on all main storages")
 		}
 
 		for _, storage := range mains {
@@ -206,3 +211,33 @@ func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
 	}
 	return clients
 }
+
+// ReplicationMode defines the replication modes for file storage.
+// SYNC_REPLICATION indicates that the replication is synchronous.
+// ASYNC_REPLICATION indicates that the replication is asynchronous.
+type ReplicationMode int
+
+const (
+	SYNC_REPLICATION ReplicationMode = iota
+	ASYNC_REPLICATION
+)
+
+// Re-export types (type alias)
+type CompressionAlgorithm = common.CompressionAlgorithm
+type EncryptionAlgorithm = common.EncryptionAlgorithm
+
+// Re-export constants
+const (
+	NO_COMPRESSION   = common.NO_COMPRESSION
+	GZIP_COMPRESSION = common.GZIP_COMPRESSION
+
+	NO_ENCRYPTION     = common.NO_ENCRYPTION
+	AES256_ENCRYPTION = common.AES256_ENCRYPTION
+)
+
+type LoadBalancingStrategy int
+
+const (
+	CLASSIC LoadBalancingStrategy = iota
+	ROUND_ROBIN
+)

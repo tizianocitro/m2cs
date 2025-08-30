@@ -149,6 +149,10 @@ func (s *S3Client) GetObject(ctx context.Context, storeBox string, fileName stri
 }
 
 func (s *S3Client) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
+
 	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(s.properties, s.properties.EncryptKey)
 	if err != nil {
 		return fmt.Errorf("build write pipeline: %w", err)

@@ -94,6 +94,10 @@ func (a *AzBlobClient) GetObject(ctx context.Context, storeBox string, fileName 
 }
 
 func (a *AzBlobClient) PutObject(ctx context.Context, storeBox, fileName string, reader io.Reader) error {
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
+
 	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(a.properties, a.properties.EncryptKey)
 	if err != nil {
 		return fmt.Errorf("build write pipeline: %w", err)

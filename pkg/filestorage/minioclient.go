@@ -112,6 +112,10 @@ func (m *MinioClient) GetObject(ctx context.Context, storeBox string, fileName s
 
 // PutObject uploads an object to the specified bucket and file name in MinioClient.
 func (m *MinioClient) PutObject(ctx context.Context, storeBox string, fileName string, reader io.Reader) error {
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
+
 	var size int64
 
 	pipe, err := transform.Factory{}.BuildWPipelineCompressEncrypt(m.properties, m.properties.EncryptKey)
