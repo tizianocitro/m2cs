@@ -129,33 +129,3 @@ func ConnectWithConnectionString(connectionString string) connectionFunc {
 	authConfig.SetConnectionString(connectionString)
 	return authConfig
 }
-
-// ReplicationMode defines the replication modes for file storage.
-// SYNC_REPLICATION indicates that the replication is synchronous.
-// ASYNC_REPLICATION indicates that the replication is asynchronous.
-type ReplicationMode int
-
-const (
-	SYNC_REPLICATION ReplicationMode = iota
-	ASYNC_REPLICATION
-)
-
-// Re-export types (type alias)
-type CompressionAlgorithm = common.CompressionAlgorithm
-type EncryptionAlgorithm = common.EncryptionAlgorithm
-
-// Re-export constants
-const (
-	NO_COMPRESSION   = common.NO_COMPRESSION
-	GZIP_COMPRESSION = common.GZIP_COMPRESSION
-
-	NO_ENCRYPTION     = common.NO_ENCRYPTION
-	AES256_ENCRYPTION = common.AES256_ENCRYPTION
-)
-
-type LoadBalancingStrategy int
-
-const (
-	CLASSIC LoadBalancingStrategy = iota
-	ROUND_ROBIN
-)

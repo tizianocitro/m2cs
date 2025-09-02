@@ -25,26 +25,28 @@ import (
 	common "m2cs/pkg"
 	"m2cs/pkg/filestorage"
 	"os"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 var (
 	// azurite variables
-	azureBlobClient         *azblob.Client
+	azuriteConnection       *filestorage.AzBlobClient // no Encryption, no compression
 	azuriteEndpoint         string
 	azuriteConnectionString string
 
 	// minio variables
-	minioClient   *minio.Client
-	minioEndpoint string
-	minioUser     = "m2csUser"
-	minioPassword = "m2csPassword"
+	minioConnection *filestorage.MinioClient // Encryption AES-256, no compression
+	minioEndpoint   string
+	minioUser       = "m2csUser"
+	minioPassword   = "m2csPassword"
 
 	// s3 variables
-	s3Client   *s3.Client
-	s3Endpoint string
+	s3Connection *filestorage.S3Client // Encryption AES-256, GZIP compression
+	s3Endpoint   string
 
 	// containers
 	minioContainer   testcontainers.Container
@@ -76,6 +78,10 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	os.Exit(code)
 }
+
+//==============================================================================
+// PutObject tests
+//==============================================================================
 
 // TestFileClient_PutSYNC_AllClientSuccess tests the PutObject method of the FileClient
 // with SYNC replication mode, ensuring that the object is successfully stored
@@ -267,7 +273,7 @@ func TestFileClient_PutSYNC_NoMainInstance(t *testing.T) {
 // TestFileClient_Async_FirstSuccessThenFanOut tests the PutObject method of the FileClient
 // with ASYNC replication mode, ensuring that the operation returns immediately after the first success,
 // while the fan-out to other storage backends happens in the background.
-func TestFileClient_Async_FirstSuccessThenFanOut(t *testing.T) {
+func TestFileClient_PutAsync_FirstSuccessThenFanOut(t *testing.T) {
 	ctx := context.Background()
 
 	fast, err := m2cs.NewMinIOConnection(
@@ -344,7 +350,7 @@ func TestFileClient_Async_FirstSuccessThenFanOut(t *testing.T) {
 
 // TestFileClient_Async_PartialSuccess tests the PutObject method of the FileClient
 // with ASYNC replication mode, simulating a failure all client.
-func TestFileClient_Async_AllFail(t *testing.T) {
+func TestFileClient_PutAsync_AllFail(t *testing.T) {
 	ctx := context.Background()
 
 	minio, err := m2cs.NewMinIOConnection(
@@ -399,7 +405,7 @@ func TestFileClient_Async_AllFail(t *testing.T) {
 
 // TestFileClient_Sync_ZeroLenghtObject tests the PutObject method of the FileClient
 // with SYNC replication mode, ensuring that zero-length objects are handled correctly
-func TestFileClient_Sync_ZeroLenghtObject(t *testing.T) {
+func TestFileClient_PutSync_ZeroLenghtObject(t *testing.T) {
 	ctx := context.Background()
 
 	minioWrap, err := m2cs.NewMinIOConnection(
@@ -436,7 +442,7 @@ func TestFileClient_Sync_ZeroLenghtObject(t *testing.T) {
 
 // TestFileClient_Sync_BigSizeObject tests the PutObject method of the FileClient
 // with SYNC replication mode, ensuring that large objects are handled correctly
-func TestFileClient_Sync_BigSizeObject(t *testing.T) {
+func TestFileClient_PutSync_BigSizeObject(t *testing.T) {
 	ctx := context.Background()
 
 	// create a large temporary file with known content and SHA-256 hash
@@ -509,6 +515,546 @@ func TestFileClient_Sync_BigSizeObject(t *testing.T) {
 }
 
 //==============================================================================
+// GetObject tests
+//==============================================================================
+
+// TestFileClient_GetClassic_ReplicaSuccess tests the GetObject method of the FileClient
+// with CLASSIC load balancing strategy, ensuring that the object is successfully retrieved
+// from the client non-main instance (read instance) when available.
+func TestFileClient_GetClassic_ReplicaSuccess(t *testing.T) {
+	ctx := context.Background()
+
+	err := minioConnection.MakeBucket(ctx, "getclassicreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create minio bucket for get classic replica success test: %v", err)
+	}
+	err = minioConnection.PutObject(ctx, "getclassicreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into minio bucket for get classic replica success test: %v", err)
+	}
+
+	err = azuriteConnection.CreateContainer(ctx, "getclassicreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create azurite container for get classic replica success test: %v", err)
+	}
+	err = azuriteConnection.PutObject(ctx, "getclassicreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into azurite container for get classic replica success test: %v", err)
+	}
+
+	err = s3Connection.CreateBucket(ctx, "getclassicreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create s3 bucket for get classic replica success test: %v", err)
+	}
+	err = s3Connection.PutObject(ctx, "getclassicreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into s3 bucket for get classic replica success test: %v", err)
+	}
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   true,
+		}, "")
+	if err != nil {
+		t.Fatalf("failed to create s3 wrapper: %v", err)
+	}
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		})
+	if fileClient == nil {
+		t.Fatalf("Error in configuraiton test: fileClient is nil")
+	}
+
+	reader, err := fileClient.GetObject(ctx, "getclassicreplicasuccess", "object")
+	defer reader.Close()
+	assert.NoError(t, err, "GetObject should succeed on one of the clients")
+
+	assert.NotNil(t, reader, "GetObject should return a non-nil reader")
+	data, err := io.ReadAll(reader)
+	assert.Equal(t, "test", string(data), "GetObject should return the correct content")
+	assert.NoError(t, err, "Reading from the reader should not produce an error")
+
+	// check that only one client was accessed
+	if successSequence == nil || len(*successSequence) != 1 || (*successSequence)[0] == "s3" {
+		t.Errorf("Expected exactly one non-main client to be accessed, but got: %v", successSequence)
+	} else {
+		t.Logf("GetObject succeeded on non-main client: %s", (*successSequence)[0])
+	}
+}
+
+// TestFileClient_GetClassic_MainSuccess tests the GetObject method of the FileClient
+// with CLASSIC load balancing strategy, ensuring that the object is successfully retrieved
+// from the main client (write instance) when replicas fails.
+func TestFileClient_GetClassic_MainSuccess(t *testing.T) {
+	ctx := context.Background()
+
+	err := s3Connection.CreateBucket(ctx, "mainsuccess")
+	if err != nil {
+		t.Fatalf("failed to create s3 bucket for get classic replica success test: %v", err)
+	}
+	err = s3Connection.PutObject(ctx, "mainsuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into s3 bucket for get classic replica success test: %v", err)
+	}
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   true,
+		}, "")
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		})
+	if fileClient == nil {
+		t.Fatalf("Error in configuraiton test: fileClient is nil")
+	}
+
+	reader, err := fileClient.GetObject(ctx, "mainsuccess", "object")
+	defer reader.Close()
+	assert.NoError(t, err, "GetObject should succeed on one of the clients")
+
+	assert.NotNil(t, reader, "GetObject should return a non-nil reader")
+	data, err := io.ReadAll(reader)
+	assert.Equal(t, "test", string(data), "GetObject should return the correct content")
+	assert.NoError(t, err, "Reading from the reader should not produce an error")
+
+	// check that only one client was accessed and it was the main client (s3)
+	if successSequence == nil || len(*successSequence) != 1 || (*successSequence)[0] != "s3" {
+		t.Errorf("Expected exactly the main client to be accessed, but got: %v", successSequence)
+	} else {
+		t.Logf("GetObject succeeded on main client: %s", (*successSequence)[0])
+	}
+}
+
+// TestFileClient_GetClassic_AllClientFail tests the GetObject method of the FileClient
+// with CLASSIC load balancing strategy, simulating failures in all client.
+func TestFileClient_GetClassic_AllClientFail(t *testing.T) {
+	ctx := context.Background()
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   true,
+		}, "")
+	if err != nil {
+		t.Fatalf("failed to create s3 wrapper: %v", err)
+	}
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		})
+	if fileClient == nil {
+		t.Fatalf("Error in configuraiton test: fileClient is nil")
+	}
+
+	reader, err := fileClient.GetObject(ctx, "not-existing-box", "object")
+	assert.ErrorContains(t, err, "all clients failed to get the object", "GetObject should fail on all clients because the bucket does not exist")
+	assert.Nil(t, reader, "GetObject should return a nil reader")
+}
+
+// TestFileClient_GetRoundRobin_ReplicaSuccess tests ROUND_ROBIN strategy
+// ensuring reads rotate across replicas in a stable order.
+func TestFileClient_GetRoundRobin_ReplicaSuccess(t *testing.T) {
+	ctx := context.Background()
+
+	err := minioConnection.MakeBucket(ctx, "getroundrobinreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create minio bucket for get classic replica success test: %v", err)
+	}
+	err = minioConnection.PutObject(ctx, "getroundrobinreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into minio bucket for get classic replica success test: %v", err)
+	}
+
+	err = azuriteConnection.CreateContainer(ctx, "getroundrobinreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create azurite container for get classic replica success test: %v", err)
+	}
+	err = azuriteConnection.PutObject(ctx, "getroundrobinreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into azurite container for get classic replica success test: %v", err)
+	}
+
+	err = s3Connection.CreateBucket(ctx, "getroundrobinreplicasuccess")
+	if err != nil {
+		t.Fatalf("failed to create s3 bucket for get classic replica success test: %v", err)
+	}
+	err = s3Connection.PutObject(ctx, "getroundrobinreplicasuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into s3 bucket for get classic replica success test: %v", err)
+	}
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   false,
+		}, "")
+	if err != nil {
+		t.Fatalf("failed to create s3 wrapper: %v", err)
+	}
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.ROUND_ROBIN,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		})
+	if fileClient == nil {
+		t.Fatalf("Error in configuraiton test: fileClient is nil")
+	}
+
+	for i := 0; i < 6; i++ {
+		reader, err := fileClient.GetObject(ctx, "getroundrobinreplicasuccess", "object")
+		if err != nil {
+			t.Fatalf("GetObject %d: %v", i, err)
+		}
+
+		assert.NotNil(t, reader, "GetObject should return a non-nil reader")
+		data, err := io.ReadAll(reader)
+		assert.Equal(t, "test", string(data), "GetObject should return the correct content")
+		assert.NoError(t, err, "Reading from the reader should not produce an error")
+
+		io.Copy(io.Discard, reader)
+		reader.Close()
+	}
+
+	want := []string{"minio", "azurite", "s3", "minio", "azurite", "s3"}
+	if !reflect.DeepEqual(*successSequence, want) {
+		t.Fatalf("RoundRobin sequence mismatch: got=%v want=%v", *successSequence, want)
+	}
+}
+
+// TestFileClient_GetClassic_MainSuccess verifies that with CLASSIC
+// load balancing the FileClient skips non-main replicas that fail (object not present)
+// and successfully retrieves the object from a main instance.
+func TestFileClient_GetRoundRobin_MainSuccess(t *testing.T) {
+	ctx := context.Background()
+
+	err := s3Connection.CreateBucket(ctx, "rrmainsuccess")
+	if err != nil {
+		t.Fatalf("failed to create s3 bucket for get classic replica success test: %v", err)
+	}
+	err = s3Connection.PutObject(ctx, "rrmainsuccess", "object", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("failed to put object into s3 bucket for get classic replica success test: %v", err)
+	}
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   true,
+		}, "")
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(
+		m2cs.SYNC_REPLICATION,
+		m2cs.ROUND_ROBIN,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		},
+	)
+	if fileClient == nil {
+		t.Fatalf("Error in configuration test: fileClient is nil")
+	}
+
+	reader, err := fileClient.GetObject(ctx, "rrmainsuccess", "object")
+	assert.NoError(t, err, "GetObject should succeed via main when replicas fail")
+	assert.NotNil(t, reader, "GetObject should return a non-nil reader")
+	data, err := io.ReadAll(reader)
+	assert.Equal(t, "test", string(data), "GetObject should return the correct content")
+	assert.NoError(t, err, "Reading from the reader should not produce an error")
+
+	defer reader.Close()
+
+	if len(*successSequence) != 1 || (*successSequence)[0] != "s3" {
+		t.Errorf("expected main client to be accessed after replica failures; got: %v", *successSequence)
+	} else {
+		t.Logf("GetObject succeeded on main client: %s", (*successSequence)[0])
+	}
+}
+
+// TestFileClient_GetRoundRobin_AllClientFail tests the GetObject method of the FileClient
+// with ROUND_ROBIN load balancing strategy, simulating failures in all client
+func TestFileClient_GetRoundRobin_AllClientFail(t *testing.T) {
+	ctx := context.Background()
+
+	minioWrap, err := m2cs.NewMinIOConnection(
+		minioEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials(minioUser, minioPassword),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		},
+		&minio.Options{})
+	if err != nil {
+		t.Fatalf("failed to create minio wrapper: %v", err)
+	}
+
+	azWrap, err := m2cs.NewAzBlobConnection(azuriteEndpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithConnectionString(azuriteConnectionString),
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
+			IsMainInstance:   false,
+		})
+	if err != nil {
+		t.Fatalf("failed to create azurite wrapper: %v", err)
+	}
+
+	s3Wrap, err := m2cs.NewS3Connection(s3Endpoint,
+		m2cs.ConnectionOptions{
+			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
+			SaveEncrypt:      m2cs.AES256_ENCRYPTION,
+			EncryptKey:       "m2cs",
+			SaveCompress:     m2cs.GZIP_COMPRESSION,
+			IsMainInstance:   true,
+		}, "")
+	if err != nil {
+		t.Fatalf("failed to create s3 wrapper: %v", err)
+	}
+
+	successSequence := &[]string{}
+
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.ROUND_ROBIN,
+		&spyClient{
+			inner:      minioWrap,
+			iD:         "minio",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      azWrap,
+			iD:         "azurite",
+			successSeq: successSequence,
+		},
+		&spyClient{
+			inner:      s3Wrap,
+			iD:         "s3",
+			successSeq: successSequence,
+		})
+	if fileClient == nil {
+		t.Fatalf("Error in configuraiton test: fileClient is nil")
+	}
+
+	reader, err := fileClient.GetObject(ctx, "not-existing-box", "object")
+	assert.ErrorContains(t, err, "all clients failed to get the object", "GetObject should fail on all clients because the bucket does not exist")
+	assert.Nil(t, reader, "GetObject should return a nil reader")
+}
+
+//==============================================================================
 // Utility functions and structs for setting up test
 //==============================================================================
 
@@ -530,7 +1076,7 @@ func runAndPopulateAzuriteContainer(ctx context.Context) {
 	azuriteEndpoint = fmt.Sprintf("%s/%s", azuriteContainer.MustServiceURL(ctx, azurite.BlobService), azurite.AccountName)
 	azuriteConnectionString = fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=%s;AccountKey=%s;BlobEndpoint=%s;", azurite.AccountName, azurite.AccountKey, azuriteEndpoint)
 
-	azureBlobClient, err = azblob.NewClientFromConnectionString(azuriteConnectionString, nil)
+	azureBlobClient, err := azblob.NewClientFromConnectionString(azuriteConnectionString, nil)
 	if err != nil {
 		log.Fatalf("failed to create the Azurite client: %s", err)
 	}
@@ -558,6 +1104,15 @@ func runAndPopulateAzuriteContainer(ctx context.Context) {
 
 	if buf.String() != "test" {
 		log.Fatalf("expected object content to be 'test', got '%s'", buf.String())
+	}
+
+	azuriteConnection, err = filestorage.NewAzBlobClient(azureBlobClient, common.ConnectionProperties{
+		IsMainInstance: true,
+		SaveCompress:   common.NO_COMPRESSION,
+		SaveEncrypt:    common.NO_ENCRYPTION,
+	})
+	if err != nil {
+		log.Fatalf("failed to create AzBlobClient: %s", err)
 	}
 }
 
@@ -588,7 +1143,7 @@ func runAndPopulateMinIOContainer(ctx context.Context) {
 		log.Fatalf("failed to get minio endpoint: %s", err)
 	}
 
-	minioClient, err = minio.New(strings.Replace(minioEndpoint, "http://", "", 1), &minio.Options{
+	minioClient, err := minio.New(strings.Replace(minioEndpoint, "http://", "", 1), &minio.Options{
 		Creds:  credentials.NewStaticV4(minioUser, minioPassword, ""),
 		Secure: false,
 	})
@@ -624,6 +1179,17 @@ func runAndPopulateMinIOContainer(ctx context.Context) {
 	if string(buf) != "test" {
 		log.Fatalf("expected object content to be 'test', got '%s'", string(buf))
 	}
+
+	minioConnection, err = filestorage.NewMinioClient(minioClient, common.ConnectionProperties{
+		IsMainInstance: true,
+		SaveCompress:   common.NO_COMPRESSION,
+		SaveEncrypt:    common.AES256_ENCRYPTION,
+		EncryptKey:     "m2cs",
+	})
+	if err != nil {
+		log.Fatalf("failed to create MinioClient: %s", err)
+	}
+
 }
 
 // runAndPopulateS3Container creates a LocalStack container with S3 service,
@@ -658,7 +1224,7 @@ func runAndPopulateS3Container(ctx context.Context) {
 
 	s3Endpoint = fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 
-	s3Client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(s3Endpoint)
 		o.UsePathStyle = true
 	})
@@ -738,6 +1304,16 @@ func runAndPopulateS3Container(ctx context.Context) {
 	if string(buf) != "test" {
 		log.Fatalf("expected object content to be 'test', got '%s'", string(buf))
 	}
+
+	s3Connection, err = filestorage.NewS3Client(s3Client, common.ConnectionProperties{
+		IsMainInstance: true,
+		SaveCompress:   common.GZIP_COMPRESSION,
+		SaveEncrypt:    common.AES256_ENCRYPTION,
+		EncryptKey:     "m2cs",
+	})
+	if err != nil {
+		log.Fatalf("failed to create S3Client: %s", err)
+	}
 }
 
 // checkObjectExistenceInClients checks if an object exists in multiple file storage clients
@@ -816,4 +1392,43 @@ func (s slowClient) GetObject(ctx context.Context, storeBox, fileName string) (i
 func (s slowClient) RemoveObject(ctx context.Context, storeBox, fileName string) error {
 	time.Sleep(s.delay)
 	return s.inner.RemoveObject(ctx, storeBox, fileName)
+}
+
+// spyClient decorates a filestorage.FileStorage
+type spyClient struct {
+	inner filestorage.FileStorage
+	iD    string
+
+	mu         sync.Mutex
+	attempts   int
+	successes  int
+	successSeq *[]string
+}
+
+func (s *spyClient) GetConnectionProperties() common.ConnectionProperties {
+	return s.inner.GetConnectionProperties()
+}
+
+func (s *spyClient) GetObject(ctx context.Context, box, key string) (io.ReadCloser, error) {
+	s.mu.Lock()
+	s.attempts++
+	s.mu.Unlock()
+
+	rc, err := s.inner.GetObject(ctx, box, key)
+	if err == nil {
+		s.mu.Lock()
+		s.successes++
+		if s.successSeq != nil {
+			*s.successSeq = append(*s.successSeq, s.iD)
+		}
+		s.mu.Unlock()
+	}
+	return rc, err
+}
+
+func (s *spyClient) PutObject(ctx context.Context, box, key string, r io.Reader) error {
+	return s.inner.PutObject(ctx, box, key, r)
+}
+func (s *spyClient) RemoveObject(ctx context.Context, box, key string) error {
+	return s.inner.RemoveObject(ctx, box, key)
 }
