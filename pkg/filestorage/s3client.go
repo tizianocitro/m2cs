@@ -119,6 +119,13 @@ func (s *S3Client) RemoveBucket(ctx context.Context, bucketName string) error {
 }
 
 func (s *S3Client) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
+	if _, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(storeBox),
+		Key:    aws.String(fileName),
+	}); err != nil {
+		return nil, fmt.Errorf("failed to head object: %w", err)
+	}
+
 	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(s.properties, s.properties.EncryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("build read pipeline: %w", err)

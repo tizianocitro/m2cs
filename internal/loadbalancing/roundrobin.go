@@ -2,7 +2,6 @@ package loadbalancing
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -63,5 +62,6 @@ func (r *roundRobinLB) Apply(ctx context.Context, storeBox, fileName string) (io
 	if len(errs) == 0 {
 		return nil, fmt.Errorf("no clients available")
 	}
-	return nil, errors.Join(errs...)
+
+	return nil, fmt.Errorf("all clients failed to get the object")
 }

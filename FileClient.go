@@ -100,6 +100,7 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 	}
 }
 
+// GetObject retrieves an object using the configured load balancing strategy.
 func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (io.ReadCloser, error) {
 	var obj io.ReadCloser
 	var mainStorages []filestorage.FileStorage
@@ -129,7 +130,6 @@ func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (
 	var err error
 
 	if f.lb == nil {
-		log.Printf("sono qui")
 		var strategy loadbalancing.Strategy
 		switch f.lbStrategy {
 		case CLASSIC:

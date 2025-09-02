@@ -73,6 +73,7 @@ func (a *AzBlobClient) ListContainers() ([]string, error) {
 }
 
 func (a *AzBlobClient) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
+	
 	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(a.properties, a.properties.EncryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("build read pipeline: %w", err)
