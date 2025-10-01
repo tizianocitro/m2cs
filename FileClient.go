@@ -5,11 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/tizianocitro/m2cs/internal/loadbalancing"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 	"io"
 	"log"
-	"m2cs/internal/loadbalancing"
-	common "m2cs/pkg"
-	"m2cs/pkg/filestorage"
 	"sync"
 )
 

@@ -1,7 +1,7 @@
 package connection
 
 import (
-	common "m2cs/pkg"
+	common "github.com/tizianocitro/m2cs/pkg"
 )
 
 type AuthConfig struct {

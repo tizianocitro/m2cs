@@ -3,9 +3,9 @@ package minio_connection_test
 import (
 	"context"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/tizianocitro/m2cs/internal/connection"
+	connfilestorage "github.com/tizianocitro/m2cs/internal/connection/filestorage"
 	"log"
-	"m2cs/internal/connection"
-	connfilestorage "m2cs/internal/connection/filestorage"
 	"os"
 	"strings"
 	"testing"

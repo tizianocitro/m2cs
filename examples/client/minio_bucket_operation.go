@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"github.com/minio/minio-go/v7"
+	"github.com/tizianocitro/m2cs"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 	"log"
-	"m2cs"
-	"m2cs/pkg/filestorage"
 	"strings"
 )
 
@@ -65,8 +65,8 @@ func createMinioClient() *filestorage.MinioClient {
 		"",
 		m2cs.ConnectionOptions{
 			ConnectionMethod: m2cs.ConnectWithCredentials("m2csUser", "m2csPassword"),
-			SaveEncrypt:      false,
-			SaveCompress:     false,
+			SaveEncrypt:      m2cs.NO_ENCRYPTION,
+			SaveCompress:     m2cs.NO_COMPRESSION,
 			IsMainInstance:   true,
 		},
 		&minio.Options{},

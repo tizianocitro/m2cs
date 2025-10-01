@@ -1,4 +1,4 @@
-module m2cs
+module github.com/tizianocitro/m2cs
 
 go 1.23
 
@@ -8,13 +8,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.59
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.77.0
+	github.com/aws/smithy-go v1.22.2
 	github.com/docker/go-connections v0.5.0
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.35.0
 	github.com/testcontainers/testcontainers-go/modules/azurite v0.35.0
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.35.0
-	github.com/testcontainers/testcontainers-go/modules/minio v0.35.0
 )
 
 require (
@@ -36,7 +36,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14 // indirect
-	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/containerd/containerd v1.7.18 // indirect
 	github.com/containerd/log v0.1.0 // indirect

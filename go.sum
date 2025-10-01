@@ -185,8 +185,6 @@ github.com/testcontainers/testcontainers-go/modules/azurite v0.35.0 h1:gUZ25e1DV
 github.com/testcontainers/testcontainers-go/modules/azurite v0.35.0/go.mod h1:2Fc67EpyOEexLAF99zhSuzu9H22zd83pkjxEHHTtHf4=
 github.com/testcontainers/testcontainers-go/modules/localstack v0.35.0 h1:0EbOXcy8XQkyDUs1Y9YPUHOUByNnlGsLi5B3ln8F/RU=
 github.com/testcontainers/testcontainers-go/modules/localstack v0.35.0/go.mod h1:MlHuaWQimz+15dmQ6R2S1vpYxhGFEpmRZQsL2NVWNng=
-github.com/testcontainers/testcontainers-go/modules/minio v0.35.0 h1:oJMrfB0hIABClRsJrVJ43zTEsCVk0JTN7RdTz9r+tk4=
-github.com/testcontainers/testcontainers-go/modules/minio v0.35.0/go.mod h1:Q7gSllC2zi78e2OF6Gwn+DXyqbxdbt6PAuaZdIPh3DQ=
 github.com/tklauser/go-sysconf v0.3.12/go.mod h1:Ho14jnntGE1fpdOqQEEaiKRpvIavV0hSfmBq8nJbHYI=
 github.com/tklauser/go-sysconf v0.3.13 h1:GBUpcahXSpR2xN01jhkNAbTLRk2Yzgggk8IM08lq3r4=
 github.com/tklauser/go-sysconf v0.3.13/go.mod h1:zwleP4Q4OehZHGn4CYZDipCgg9usW5IJePewFCGVEa0=

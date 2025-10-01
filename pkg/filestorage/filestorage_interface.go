@@ -2,8 +2,8 @@ package filestorage
 
 import (
 	"context"
+	common "github.com/tizianocitro/m2cs/pkg"
 	"io"
-	common "m2cs/pkg"
 )
 
 type FileStorage interface {

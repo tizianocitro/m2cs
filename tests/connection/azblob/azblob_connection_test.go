@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/azurite"
+	"github.com/tizianocitro/m2cs/internal/connection"
+	connfilestorage "github.com/tizianocitro/m2cs/internal/connection/filestorage"
 	"log"
-	"m2cs/internal/connection"
-	connfilestorage "m2cs/internal/connection/filestorage"
 	"os"
 	"testing"
 )

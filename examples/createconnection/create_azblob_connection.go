@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/tizianocitro/m2cs"
 	"log"
-	"m2cs"
 )
 
 func main() {

@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 
-	"m2cs/pkg"
-	"m2cs/pkg/filestorage"
+	"github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 )
 
 var (

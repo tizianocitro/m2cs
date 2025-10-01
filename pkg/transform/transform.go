@@ -2,10 +2,10 @@ package transform
 
 import (
 	"fmt"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/transform/compression"
+	"github.com/tizianocitro/m2cs/pkg/transform/encryption"
 	"io"
-	common "m2cs/pkg"
-	"m2cs/pkg/transform/compression"
-	"m2cs/pkg/transform/encryption"
 )
 
 // WriterTransform applies a write-time transformation to reader

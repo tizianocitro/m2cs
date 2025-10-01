@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/transform"
 	"io"
-	common "m2cs/pkg"
-	"m2cs/pkg/transform"
 )
 
 type AzBlobClient struct {
@@ -73,7 +73,7 @@ func (a *AzBlobClient) ListContainers() ([]string, error) {
 }
 
 func (a *AzBlobClient) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
-	
+
 	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(a.properties, a.properties.EncryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("build read pipeline: %w", err)

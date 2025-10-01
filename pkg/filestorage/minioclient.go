@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/minio/minio-go/v7"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/transform"
 	"io"
-	common "m2cs/pkg"
-	"m2cs/pkg/transform"
 	"strings"
 )
 

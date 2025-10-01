@@ -3,10 +3,10 @@ package m2cs
 import (
 	"fmt"
 	"github.com/minio/minio-go/v7"
-	"m2cs/internal/connection"
-	connfilestorage "m2cs/internal/connection/filestorage"
-	common "m2cs/pkg"
-	"m2cs/pkg/filestorage"
+	"github.com/tizianocitro/m2cs/internal/connection"
+	connfilestorage "github.com/tizianocitro/m2cs/internal/connection/filestorage"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 )
 
 // ConnectionOptions holds the options for creating a connection.

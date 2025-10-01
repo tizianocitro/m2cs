@@ -7,9 +7,9 @@ import (
 	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"m2cs/internal/connection"
-	common "m2cs/pkg"
-	"m2cs/pkg/filestorage"
+	"github.com/tizianocitro/m2cs/internal/connection"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 	"os"
 )
 
