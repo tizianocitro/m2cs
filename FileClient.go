@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/tizianocitro/m2cs/internal/loadbalancing"
-	common "github.com/tizianocitro/m2cs/pkg"
-	"github.com/tizianocitro/m2cs/pkg/filestorage"
 	"io"
 	"log"
 	"sync"
+
+	"github.com/tizianocitro/m2cs/internal/loadbalancing"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 )
 
 type FileClient struct {
@@ -132,7 +133,7 @@ func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (
 	if f.lb == nil {
 		var strategy loadbalancing.Strategy
 		switch f.lbStrategy {
-		case CLASSIC:
+		case READ_REPLICA_FIRST:
 			strategy = loadbalancing.CLASSIC
 		case ROUND_ROBIN:
 			strategy = loadbalancing.ROUND_ROBIN
@@ -238,6 +239,6 @@ const (
 type LoadBalancingStrategy int
 
 const (
-	CLASSIC LoadBalancingStrategy = iota
+	READ_REPLICA_FIRST LoadBalancingStrategy = iota
 	ROUND_ROBIN
 )

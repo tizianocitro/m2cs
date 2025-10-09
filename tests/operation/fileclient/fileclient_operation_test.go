@@ -6,6 +6,15 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"reflect"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -22,14 +31,6 @@ import (
 	"github.com/tizianocitro/m2cs"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/filestorage"
-	"io"
-	"log"
-	"os"
-	"reflect"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 var (
@@ -120,7 +121,7 @@ func TestFileClient_PutSYNC_AllClientSuccess(t *testing.T) {
 		},
 		"")
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap, s3Wrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap, s3Wrap)
 
 	err = fileClient.PutObject(ctx, "test-box", "putTest", strings.NewReader("test"))
 	assert.NoError(t, err, "PutObject should succeed on all clients")
@@ -177,7 +178,7 @@ func TestFileClient_PutSYNC_PartialtSuccess(t *testing.T) {
 		t.Fatalf("failed to create azurite container for partial fail test: %v", err)
 	}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap, s3Wrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap, s3Wrap)
 	err = fileClient.PutObject(ctx, "partial-fail-box", "putTest", strings.NewReader("test"))
 	assert.Error(t, err, "PutObject should fail because S3 client is not configured properly")
 	assert.ErrorContains(t, err, "PutObject partially failed on 1/3 storages", "Error should indicate failure in 1/3 clients")
@@ -226,7 +227,7 @@ func TestFileClient_PutSYNC_AllClientFail(t *testing.T) {
 		},
 		"")
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap, s3Wrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap, s3Wrap)
 	err = fileClient.PutObject(ctx, "not-existing-box", "putTest", strings.NewReader("test"))
 	assert.ErrorContains(t, err, "PutObject failed on all 3 storages", "PutObject should fail on all clients because the bucket does not exist")
 
@@ -261,7 +262,7 @@ func TestFileClient_PutSYNC_NoMainInstance(t *testing.T) {
 			IsMainInstance:   false,
 		})
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap)
 
 	err = fileClient.PutObject(ctx, "test-box", "putTest", strings.NewReader("test"))
 	assert.ErrorContains(t, err, "no main instance found for PutObject operation", "PutObject should fail because there is not at least one main instance")
@@ -335,7 +336,7 @@ func TestFileClient_PutAsync_FirstSuccessThenFanOut(t *testing.T) {
 	slow1 := slowClient{inner: az, delay: 1500 * time.Millisecond}
 	slow2 := slowClient{inner: s3w, delay: 1500 * time.Millisecond}
 
-	fileClient := m2cs.NewFileClient(m2cs.ASYNC_REPLICATION, m2cs.CLASSIC, fast, slow1, slow2)
+	fileClient := m2cs.NewFileClient(m2cs.ASYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, fast, slow1, slow2)
 	if fileClient == nil {
 		t.Fatalf("Error in configuraiton test: fileClient is nil")
 	}
@@ -394,7 +395,7 @@ func TestFileClient_PutAsync_AllFail(t *testing.T) {
 		t.Fatalf("fail to create s3 wrapper: %v", err)
 	}
 
-	fileClient := m2cs.NewFileClient(m2cs.ASYNC_REPLICATION, m2cs.CLASSIC, minio, az, s3)
+	fileClient := m2cs.NewFileClient(m2cs.ASYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minio, az, s3)
 	if fileClient == nil {
 		t.Fatalf("Error in configuraiton test: fileClient is nil")
 	}
@@ -434,7 +435,7 @@ func TestFileClient_PutSync_ZeroLenghtObject(t *testing.T) {
 		t.Fatalf("failed to create azurite wrapper: %v", err)
 	}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap)
 
 	err = fileClient.PutObject(ctx, "test-box", "putTest", bytes.NewReader(nil))
 	assert.NoError(t, err, "PutObject should succeed on all clients")
@@ -487,7 +488,7 @@ func TestFileClient_PutSync_BigSizeObject(t *testing.T) {
 		t.Fatalf("failed to create azurite wrapper: %v", err)
 	}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC, minioWrap, azWrap)
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST, minioWrap, azWrap)
 
 	err = fileClient.PutObject(ctx, "test-box", "putTest", f)
 	assert.NoError(t, err, "PutObject should succeed on all clients")
@@ -519,7 +520,7 @@ func TestFileClient_PutSync_BigSizeObject(t *testing.T) {
 //==============================================================================
 
 // TestFileClient_GetClassic_ReplicaSuccess tests the GetObject method of the FileClient
-// with CLASSIC load balancing strategy, ensuring that the object is successfully retrieved
+// with READ_REPLICA_FIRST load balancing strategy, ensuring that the object is successfully retrieved
 // from the client non-main instance (read instance) when available.
 func TestFileClient_GetClassic_ReplicaSuccess(t *testing.T) {
 	ctx := context.Background()
@@ -590,7 +591,7 @@ func TestFileClient_GetClassic_ReplicaSuccess(t *testing.T) {
 
 	successSequence := &[]string{}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST,
 		&spyClient{
 			inner:      minioWrap,
 			iD:         "minio",
@@ -628,7 +629,7 @@ func TestFileClient_GetClassic_ReplicaSuccess(t *testing.T) {
 }
 
 // TestFileClient_GetClassic_MainSuccess tests the GetObject method of the FileClient
-// with CLASSIC load balancing strategy, ensuring that the object is successfully retrieved
+// with READ_REPLICA_FIRST load balancing strategy, ensuring that the object is successfully retrieved
 // from the main client (write instance) when replicas fails.
 func TestFileClient_GetClassic_MainSuccess(t *testing.T) {
 	ctx := context.Background()
@@ -678,7 +679,7 @@ func TestFileClient_GetClassic_MainSuccess(t *testing.T) {
 
 	successSequence := &[]string{}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST,
 		&spyClient{
 			inner:      minioWrap,
 			iD:         "minio",
@@ -716,7 +717,7 @@ func TestFileClient_GetClassic_MainSuccess(t *testing.T) {
 }
 
 // TestFileClient_GetClassic_AllClientFail tests the GetObject method of the FileClient
-// with CLASSIC load balancing strategy, simulating failures in all client.
+// with READ_REPLICA_FIRST load balancing strategy, simulating failures in all client.
 func TestFileClient_GetClassic_AllClientFail(t *testing.T) {
 	ctx := context.Background()
 
@@ -759,7 +760,7 @@ func TestFileClient_GetClassic_AllClientFail(t *testing.T) {
 
 	successSequence := &[]string{}
 
-	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.CLASSIC,
+	fileClient := m2cs.NewFileClient(m2cs.SYNC_REPLICATION, m2cs.READ_REPLICA_FIRST,
 		&spyClient{
 			inner:      minioWrap,
 			iD:         "minio",
@@ -896,7 +897,7 @@ func TestFileClient_GetRoundRobin_ReplicaSuccess(t *testing.T) {
 	}
 }
 
-// TestFileClient_GetClassic_MainSuccess verifies that with CLASSIC
+// TestFileClient_GetClassic_MainSuccess verifies that with READ_REPLICA_FIRST
 // load balancing the FileClient skips non-main replicas that fail (object not present)
 // and successfully retrieves the object from a main instance.
 func TestFileClient_GetRoundRobin_MainSuccess(t *testing.T) {
