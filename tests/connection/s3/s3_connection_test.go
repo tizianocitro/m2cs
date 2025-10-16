@@ -3,6 +3,10 @@ package s3_connection_test
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"testing"
+
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,9 +14,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
 	"github.com/tizianocitro/m2cs/internal/connection"
 	connfilestorage "github.com/tizianocitro/m2cs/internal/connection/filestorage"
-	"log"
-	"os"
-	"testing"
 )
 
 var s3ServiceUrl string
@@ -141,6 +142,16 @@ func TestCreateS3Connection_WithCredentials_Success(t *testing.T) {
 // TestCreateS3Connection_WithEnv_Success tests the behavior of CreateS3Connection function
 // when environment credentials are provided. It ensures the function returns a valid S3Connection.
 func TestCreateS3Connection_WithEnv_Success(t *testing.T) {
+	originalAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+	originalSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+
+	os.Setenv("AWS_ACCESS_KEY_ID", "m2csUser")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "m2csPassword")
+	defer func() {
+		os.Setenv("AWS_ACCESS_KEY_ID", originalAccessKey)
+		os.Setenv("AWS_SECRET_ACCESS_KEY", originalSecretKey)
+	}()
+
 	config := &connection.AuthConfig{}
 	config.SetConnectType("withEnv")
 

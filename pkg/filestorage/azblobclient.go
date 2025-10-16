@@ -3,10 +3,11 @@ package filestorage
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/transform"
-	"io"
 )
 
 type AzBlobClient struct {
@@ -126,6 +127,7 @@ func (a *AzBlobClient) RemoveObject(ctx context.Context, storeBox string, fileNa
 	if err != nil {
 		return err
 	}
+	
 	return nil
 }
 

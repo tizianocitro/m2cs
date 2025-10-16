@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/minio/minio-go/v7"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/transform"
-	"io"
-	"strings"
 )
 
 // MinioClient is a client for interacting with MinIO storage.
@@ -93,7 +94,7 @@ func (m *MinioClient) RemoveBucket(ctx context.Context, bucketName string) error
 // GetObject retrieves an object from the specified bucket and file name in MinioClient.
 func (m *MinioClient) GetObject(ctx context.Context, storeBox string, fileName string) (io.ReadCloser, error) {
 	if _, err := m.client.StatObject(ctx, storeBox, fileName, minio.StatObjectOptions{}); err != nil {
-		return nil, fmt.Errorf("minio stat: %w", err)
+		return nil, fmt.Errorf("failed to get the object from MinIO client: %w", err)
 	}
 
 	pipe, err := transform.Factory{}.BuildRPipelineDecryptDecompress(m.properties, m.properties.EncryptKey)

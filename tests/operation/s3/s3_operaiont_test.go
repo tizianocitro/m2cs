@@ -4,6 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	_ "github.com/aws/aws-sdk-go-v2/config"
@@ -18,12 +25,6 @@ import (
 	_ "github.com/testcontainers/testcontainers-go/wait"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/filestorage"
-	"io"
-	"log"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 var (
@@ -182,7 +183,7 @@ func TestS3Client_GetObject_S3Error(t *testing.T) {
 	reader, err := testClient.GetObject(context.TODO(), "non-existent-bucket", "object.txt")
 
 	require.Error(t, err, "expected error for S3 error, got nil")
-	assert.ErrorContains(t, err, "NoSuchBucket")
+	assert.ErrorContains(t, err, "failed to head object")
 	assert.Nil(t, reader, "expected nil reader for non-existent bucket")
 }
 
