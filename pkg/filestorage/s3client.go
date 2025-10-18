@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/transform"
-	"io"
-	"log"
-	"time"
 )
 
 type S3Client struct {
@@ -182,18 +183,18 @@ func (s *S3Client) PutObject(ctx context.Context, storeBox string, fileName stri
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "EntityTooLarge" {
-			log.Printf("Error while uploading object to %s. The object is too large.\n"+
+			return fmt.Errorf("Error while uploading object to %s. The object is too large.\n"+
 				"To upload objects larger than 5GB, use the S3 console (160GB max)\n"+
 				"or the multipart upload API (5TB max).", storeBox)
 		} else {
-			log.Printf("Couldn't upload file %v to %v. Here's why: %v\n",
+			return fmt.Errorf("Couldn't upload file %v to %v. Here's why: %v\n",
 				fileName, storeBox, err)
 		}
 	} else {
 		err = s3.NewObjectExistsWaiter(s.client).Wait(
 			ctx, &s3.HeadObjectInput{Bucket: aws.String(storeBox), Key: aws.String(fileName)}, time.Minute)
 		if err != nil {
-			log.Printf("Failed attempt to wait for object %s to exist.\n", fileName)
+			return fmt.Errorf("Failed attempt to wait for object %s to exist.\n", fileName)
 		}
 	}
 

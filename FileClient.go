@@ -8,7 +8,9 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
+	"github.com/tizianocitro/m2cs/internal/caching"
 	"github.com/tizianocitro/m2cs/internal/loadbalancing"
 	common "github.com/tizianocitro/m2cs/pkg"
 	"github.com/tizianocitro/m2cs/pkg/filestorage"
@@ -19,6 +21,7 @@ type FileClient struct {
 	replicationMode ReplicationMode
 	lbStrategy      LoadBalancingStrategy
 	lb              loadbalancing.LoadBalancer
+	cache           *caching.FileCache
 }
 
 func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBalancingStrategy, storages ...filestorage.FileStorage) *FileClient {
@@ -26,6 +29,7 @@ func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBal
 		storages:        storages,
 		replicationMode: replicationMode,
 		lbStrategy:      loadBalacingStrategy,
+		cache:           nil,
 	}
 }
 
@@ -79,6 +83,10 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 			}()
 		}
 
+		if f.cache != nil && f.cache.Enabled() {
+			f.cache.Invalidate(storeBox + "/" + fileName)
+		}
+
 		return nil
 
 	case SYNC_REPLICATION:
@@ -89,6 +97,9 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 			}
 		}
 		if len(errs) == 0 {
+			if f.cache != nil && f.cache.Enabled() {
+				f.cache.Invalidate(storeBox + "/" + fileName)
+			}
 			return nil
 		}
 		if len(errs) == len(mains) {
@@ -103,6 +114,13 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 
 // GetObject retrieves an object using the configured load balancing strategy.
 func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (io.ReadCloser, error) {
+	if f.cache != nil && f.cache.Enabled() {
+		data := f.cache.GetFile(storeBox + "/" + fileName)
+		if data != nil {
+			return data, nil
+		}
+	}
+
 	var obj io.ReadCloser
 	var mainStorages []filestorage.FileStorage
 	var nonMainStorages []filestorage.FileStorage
@@ -153,7 +171,17 @@ func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (
 		return nil, fmt.Errorf("FileClient GetObject error: %w", err)
 	}
 
-	return obj, nil
+	var buf []byte
+	buf, err = io.ReadAll(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object data: %w", err)
+	}
+
+	if f.cache != nil && f.cache.Enabled() {
+		f.cache.Store(storeBox+"/"+fileName, buf)
+	}
+
+	return io.NopCloser(bytes.NewReader(buf)), nil
 
 }
 
@@ -195,6 +223,9 @@ func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName
 	wg.Wait()
 
 	if len(errs) == 0 {
+		if f.cache != nil && f.cache.Enabled() {
+			f.cache.Invalidate(storeBox + "/" + fileName)
+		}
 		return nil
 	}
 
@@ -205,12 +236,68 @@ func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName
 	return fmt.Errorf("RemoveObject partially failed on %d/%d storages: %w", len(errs), len(f.storages), errors.Join(errs...))
 }
 
+func (f *FileClient) ConfigureCache(options CacheOptions) error {
+	if f == nil {
+		return fmt.Errorf("file client is nil")
+	}
+
+	if options.MaxSizeMB <= 0 {
+		options.MaxSizeMB = 1024
+	}
+	if options.TTL <= 0 {
+		options.TTL = 10 * time.Minute
+	}
+	if options.MaxItems <= 0 {
+		options.MaxItems = 5
+	}
+
+	f.cache = &caching.FileCache{
+		File: make(map[string]*caching.FileInformation),
+		Options: caching.CacheOptions{
+			Enabled:   options.Enabled,
+			MaxSizeMB: options.MaxSizeMB,
+			TTL:       options.TTL,
+			MaxItems:  options.MaxItems,
+		},
+	}
+
+	return nil
+}
+
+func (f *FileClient) EnableCache() error {
+	if f.cache == nil {
+		return fmt.Errorf("Cache is not configured, configure it before enabling")
+	} else {
+		f.cache.Options.Enabled = true
+		return nil
+	}
+}
+
+func (f *FileClient) DisableCache() {
+	if f.cache != nil {
+		f.cache.Options.Enabled = false
+	}
+}
+
+func (f *FileClient) ClearCache() {
+	if f.cache != nil {
+		f.cache.Clear()
+	}
+}
+
 func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
 	var clients []loadbalancing.Client
 	for _, s := range storages {
 		clients = append(clients, s)
 	}
 	return clients
+}
+
+type CacheOptions struct {
+	Enabled   bool          // Indicates if caching is enabled (default: false)
+	MaxSizeMB int64         // Maximum size of the cache in megabytes (default: 1024)
+	TTL       time.Duration // Time-to-live for cache entries (default: 10 * time.Minute)
+	MaxItems  int           // Maximum number of items in the cache (default: 5)
 }
 
 // ReplicationMode defines the replication modes for file storage.
