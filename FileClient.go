@@ -236,6 +236,7 @@ func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName
 	return fmt.Errorf("RemoveObject partially failed on %d/%d storages: %w", len(errs), len(f.storages), errors.Join(errs...))
 }
 
+// CacheOptions defines the configuration options for the file cache.
 func (f *FileClient) ConfigureCache(options CacheOptions) error {
 	if f == nil {
 		return fmt.Errorf("file client is nil")
@@ -251,32 +252,55 @@ func (f *FileClient) ConfigureCache(options CacheOptions) error {
 		options.MaxItems = 5
 	}
 
+	if f.cache != nil {
+		f.cache.StopValidationRoutine()
+	}
+
 	f.cache = &caching.FileCache{
 		File: make(map[string]*caching.FileInformation),
 		Options: caching.CacheOptions{
-			Enabled:   options.Enabled,
-			MaxSizeMB: options.MaxSizeMB,
-			TTL:       options.TTL,
-			MaxItems:  options.MaxItems,
+			Enabled:           options.Enabled,
+			MaxSizeMB:         options.MaxSizeMB,
+			TTL:               options.TTL,
+			MaxItems:          options.MaxItems,
+			ValidationOptions: options.ValidationStrategy,
 		},
+	}
+	if f.cache.Options.Enabled {
+		f.cache.StartValidationRoutine()
 	}
 
 	return nil
 }
 
+// EnableCache marks the cache as enabled and starts the validation routine
+// if a validation strategy is configured.
 func (f *FileClient) EnableCache() error {
 	if f.cache == nil {
-		return fmt.Errorf("Cache is not configured, configure it before enabling")
-	} else {
-		f.cache.Options.Enabled = true
+		return fmt.Errorf("cache is not configured; configure it before enabling")
+	}
+	if f.cache.Options.Enabled {
 		return nil
 	}
+
+	f.cache.Options.Enabled = true
+
+	// Start validation routine if a strategy is set
+	if v := f.cache.Options.ValidationOptions; v != nil && v.Strategy != caching.NO_VALIDATION {
+		_ = f.cache.StartValidationRoutine()
+	}
+	return nil
 }
 
+// DisableCache marks the cache as disabled and stops the validation routine.
+// Safe to call multiple times.
 func (f *FileClient) DisableCache() {
-	if f.cache != nil {
-		f.cache.Options.Enabled = false
+	if f.cache == nil {
+		return
 	}
+
+	f.cache.StopValidationRoutine()
+	f.cache.Options.Enabled = false
 }
 
 func (f *FileClient) ClearCache() {
@@ -291,13 +315,6 @@ func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
 		clients = append(clients, s)
 	}
 	return clients
-}
-
-type CacheOptions struct {
-	Enabled   bool          // Indicates if caching is enabled (default: false)
-	MaxSizeMB int64         // Maximum size of the cache in megabytes (default: 1024)
-	TTL       time.Duration // Time-to-live for cache entries (default: 10 * time.Minute)
-	MaxItems  int           // Maximum number of items in the cache (default: 5)
 }
 
 // ReplicationMode defines the replication modes for file storage.

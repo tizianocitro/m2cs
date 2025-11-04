@@ -2,6 +2,7 @@ package m2cs
 
 import (
 	"fmt"
+
 	"github.com/minio/minio-go/v7"
 	"github.com/tizianocitro/m2cs/internal/connection"
 	connfilestorage "github.com/tizianocitro/m2cs/internal/connection/filestorage"
