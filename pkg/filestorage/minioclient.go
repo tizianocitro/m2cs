@@ -168,6 +168,18 @@ func (m *MinioClient) GetConnectionProperties() common.ConnectionProperties {
 	return m.properties
 }
 
+func (m *MinioClient) ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	_, err := m.client.StatObject(ctx, storeBox, fileName, minio.StatObjectOptions{})
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check object existence in minio: %w", err)
+	}
+	
+	return true, nil
+}
+
 // getSizeFromReader ensures that the reader has a known size.
 // If the reader is seekable or supports Len(), it reuses it.
 // Otherwise it materializes into memory and returns a *bytes.Reader.

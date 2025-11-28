@@ -1395,6 +1395,11 @@ func (s slowClient) RemoveObject(ctx context.Context, storeBox, fileName string)
 	return s.inner.RemoveObject(ctx, storeBox, fileName)
 }
 
+func (s slowClient) ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	time.Sleep(s.delay)
+	return s.inner.ExistObject(ctx, storeBox, fileName)
+}
+
 // spyClient decorates a filestorage.FileStorage
 type spyClient struct {
 	inner filestorage.FileStorage
@@ -1432,4 +1437,8 @@ func (s *spyClient) PutObject(ctx context.Context, box, key string, r io.Reader)
 }
 func (s *spyClient) RemoveObject(ctx context.Context, box, key string) error {
 	return s.inner.RemoveObject(ctx, box, key)
+}
+
+func (s *spyClient) ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	return s.inner.ExistObject(ctx, storeBox, fileName)
 }

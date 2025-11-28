@@ -32,6 +32,7 @@ These methods are exposed by all storage clients (S3, Azure, MinIO) and by the h
 - [`PutObject()`](#putobject)
 - [`GetObject()`](#getobject)
 - [`RemoveObject()`](#removeobject)
+- [`ExistObject()`](#existobject)
 
 ---
 
@@ -418,3 +419,17 @@ Deletes the specified object from storage.
 | `ctx`      | `context.Context` | Context for timeout/cancellation.                          |
 | `storeBox` | `string`          | Name of the bucket/container where the file to be deleted. |
 | `fileName` | `string`          | Name of the file to be deleted.                            |
+
+### ExistObject()
+
+```go
+ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error)
+```
+
+Checks whether the specified object exists in storage.
+
+| Param      | Type              | Description                                                 |
+|------------|-------------------|-------------------------------------------------------------|
+| `ctx`      | `context.Context` | Context for timeout/cancellation.                           |
+| `storeBox` | `string`          | Name of the bucket/container in which to check for the file's existence. |
+| `fileName` | `string`          | Name of the file to be checked.                             |

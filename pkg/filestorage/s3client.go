@@ -233,3 +233,19 @@ func (s *S3Client) RemoveObject(ctx context.Context, storeBox string, fileName s
 
 	return err
 }
+
+func (s *S3Client) ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(storeBox),
+		Key:    aws.String(fileName),
+	})
+	if err != nil {
+		var noKey *types.NoSuchKey
+		if errors.As(err, &noKey) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to head object: %w", err)
+	}
+
+	return true, nil
+}

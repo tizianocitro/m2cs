@@ -127,12 +127,34 @@ func (a *AzBlobClient) RemoveObject(ctx context.Context, storeBox string, fileNa
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
 func (a *AzBlobClient) GetConnectionProperties() common.ConnectionProperties {
 	return a.properties
+}
+
+func (a *AzBlobClient) ExistObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	pager := a.client.NewListBlobsFlatPager(storeBox, &azblob.ListBlobsFlatOptions{
+		Prefix: &fileName,
+	})
+	if pager == nil {
+		return false, fmt.Errorf("failed to create blob pager")
+	}
+
+	for pager.More() {
+		resp, err := pager.NextPage(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to list blobs: %w", err)
+		}
+		for _, blob := range resp.Segment.BlobItems {
+			if blob.Name != nil && *blob.Name == fileName {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (a *AzBlobClient) ListObjects(ctx context.Context, storeBox string) ([]string, error) {

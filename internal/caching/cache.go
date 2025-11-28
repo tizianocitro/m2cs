@@ -217,7 +217,7 @@ func ValidationStrategyFactory(v *ValidationOptions) (ValidationRunner, error) {
 	}
 
 	switch v.Strategy {
-	
+
 	case SAMPLING_VALIDATION:
 		return &SamplingValidation{SampleRate: v.SamplingPercent}, nil
 

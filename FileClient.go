@@ -90,12 +90,28 @@ func (f *FileClient) PutObject(ctx context.Context, storeBox, fileName string, r
 		return nil
 
 	case SYNC_REPLICATION:
-		var errs []error
+		var wg sync.WaitGroup
+		errCh := make(chan error, len(mains))
+
+		wg.Add(len(mains))
 		for _, storage := range mains {
-			if err := storage.PutObject(ctx, storeBox, fileName, bytes.NewReader(buf)); err != nil {
-				errs = append(errs, fmt.Errorf("[sync] PutObject failed on %T: %w", storage, err))
-			}
+			s := storage
+			go func() {
+				defer wg.Done()
+				if err := s.PutObject(ctx, storeBox, fileName, bytes.NewReader(buf)); err != nil {
+					errCh <- fmt.Errorf("[sync] PutObject failed on %T: %w", s, err)
+				}
+			}()
 		}
+
+		wg.Wait()
+		close(errCh)
+
+		var errs []error
+		for e := range errCh {
+			errs = append(errs, e)
+		}
+
 		if len(errs) == 0 {
 			if f.cache != nil && f.cache.Enabled() {
 				f.cache.Invalidate(storeBox + "/" + fileName)
@@ -234,6 +250,27 @@ func (f *FileClient) RemoveObject(ctx context.Context, storeBox string, fileName
 	}
 
 	return fmt.Errorf("RemoveObject partially failed on %d/%d storages: %w", len(errs), len(f.storages), errors.Join(errs...))
+}
+
+func (f FileClient) ExistsObject(ctx context.Context, storeBox string, fileName string) (bool, error) {
+	var errs []error
+
+	for _, storage := range f.storages {
+		exists, err := storage.ExistObject(ctx, storeBox, fileName)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("ExistsObject failed on storage %T: %w", storage, err))
+			continue
+		}
+		if exists {
+			return true, nil
+		}
+	}
+
+	if len(errs) == len(f.storages) {
+		return false, fmt.Errorf("ExistsObject failed on all storages: %w", errors.Join(errs...))
+	}
+
+	return false, nil
 }
 
 // CacheOptions defines the configuration options for the file cache.
