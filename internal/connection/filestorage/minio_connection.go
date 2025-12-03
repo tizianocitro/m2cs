@@ -5,30 +5,31 @@ import (
 	"fmt"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"m2cs/internal/connection"
+	"github.com/tizianocitro/m2cs/internal/connection"
+	common "github.com/tizianocitro/m2cs/pkg"
+	"github.com/tizianocitro/m2cs/pkg/filestorage"
 	"os"
+	"strings"
 )
 
-// MinioConnection represents a connection to a MinIO server.
-type MinioConnection struct {
-	client *minio.Client
-	connection.Properties
-}
-
-// GetClient returns the MinIO client.
-func (m *MinioConnection) GetClient() *minio.Client {
-	return m.client
-}
-
-// CreateMinioConnection creates a new MinioConnection.
+// CreateMinioConnection creates a new MinioClient.
 // It takes an endpoint, an AuthConfig, and optional MinIO options.
-// It returns a MinioConnection or an error if the connection could not be established.
-func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minioOptions *minio.Options) (*MinioConnection, error) {
-
+// It returns a MinioClient or an error if the connection could not be established.
+func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minioOptions *minio.Options) (*filestorage.MinioClient, error) {
 	if minioOptions == nil {
 		minioOptions = &minio.Options{
 			Secure: false,
 		}
+	}
+
+	if endpoint == "" || endpoint == "default" {
+		endpoint = "localhost:9000"
+	}
+
+	if strings.Contains(endpoint, "http://") {
+		endpoint = strings.Replace(endpoint, "http://", "", 1)
+	} else if strings.Contains(endpoint, "https://") {
+		endpoint = strings.Replace(endpoint, "https://", "", 1)
 	}
 
 	switch config.GetConnectType() {
@@ -46,25 +47,24 @@ func CreateMinioConnection(endpoint string, config *connection.AuthConfig, minio
 		minioOptions.Creds = credentials.NewStaticV4(accessKey, secretKey, "")
 
 	default:
-		return nil, fmt.Errorf("invalid connection type: %s", config.GetConnectType())
-	}
-
-	conn := &MinioConnection{
-		Properties: config.GetProperties(),
+		return nil, fmt.Errorf("invalid connection type for MinIO: %s", config.GetConnectType())
 	}
 
 	minioClient, err := minio.New(endpoint, minioOptions)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MinIO client: %w", err)
 	}
 
 	_, err = minioClient.ListBuckets(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MinIO: %w", err)
 	}
 
-	conn.client = minioClient
+	conn, err := filestorage.NewMinioClient(minioClient, common.ConnectionProperties{
+		IsMainInstance: config.GetProperties().IsMainInstance,
+		SaveEncrypt:    config.GetProperties().SaveEncrypted,
+		SaveCompress:   config.GetProperties().SaveCompressed,
+		EncryptKey:     config.GetProperties().EncryptKey})
+
 	return conn, nil
 }

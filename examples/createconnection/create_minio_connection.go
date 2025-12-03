@@ -3,14 +3,14 @@ package main
 import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/tizianocitro/m2cs"
 	"log"
-	"m2cs"
 )
 
 func main() {
 	endpoint := "localhost:9000"
-	accessKeyID := "accesskey"
-	secretAccessKey := "secretkey"
+	accessKeyID := "m2csUser"
+	secretAccessKey := "m2csPassword"
 	useSSL := true
 
 	//================================================================================================
@@ -18,15 +18,14 @@ func main() {
 	conn, err := m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithCredentials(accessKeyID, secretAccessKey),
 		IsMainInstance:   true,
-		SaveEncrypt:      false,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.GZIP_COMPRESSION,
 	}, &minio.Options{
 		Secure: useSSL,
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	log.Printf("%#v\n", conn) // minio connection is now setup
 
 	//================================================================================================
@@ -36,15 +35,14 @@ func main() {
 	conn, err = m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithEnvCredentials(),
 		IsMainInstance:   false,
-		SaveEncrypt:      true,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.NO_COMPRESSION,
 	}, &minio.Options{
 		Secure: useSSL,
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	log.Printf("%#v\n", conn) // minio connection is now setup
 
 	//================================================================================================
@@ -53,8 +51,8 @@ func main() {
 	conn, err = m2cs.NewMinIOConnection(endpoint, m2cs.ConnectionOptions{
 		ConnectionMethod: m2cs.ConnectWithCredentials(accessKeyID, secretAccessKey),
 		IsMainInstance:   true,
-		SaveEncrypt:      false,
-		SaveCompress:     false,
+		SaveEncrypt:      m2cs.NO_ENCRYPTION,
+		SaveCompress:     m2cs.GZIP_COMPRESSION,
 	}, nil)
 }
 
