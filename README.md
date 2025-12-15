@@ -60,13 +60,13 @@
 
 ## About The Project
 
-M²CS is a Go library designed to abstract and unify interactions with heterogeneous cloud storage providers. It simplifies the development of multi-cloud and hybrid-cloud applications by providing a consistent interface for object storage, transparent data replication, intelligent load balancing, caching, and secure file transformations such as encryption and compression."
+M²CS is a Go library that abstracts and unifies interactions with heterogeneous cloud storage providers. It simplifies the development of multi-cloud and hybrid-cloud applications by providing a consistent interface for object storage, transparent data replication, load balancing, caching, and secure file transformations such as encryption and compression.
 
 ### Overview
 
 In modern cloud-native architectures, relying on a single storage provider creates **vendor lock-in** risks and limits infrastructure flexibility. Developing multi-cloud solutions, however, often leads to code fragmentation due to incompatible SDKs and APIs.
 
-**M²CS** solves this by acting as an intermediate abstraction layer. It allows developers to write code once and deploy it across multiple providers (AWS S3, Azure Blob, MinIO) without managing specific SDK implementations.
+**M²CS** solves this by acting as an intermediate abstraction layer. It allows developers to write code that connects to multiple providers (AWS S3, Azure Blob Storage, MinIO) without using specific SDK implementations.
 
 ### Supported Providers
 
@@ -177,7 +177,7 @@ For a complete working example, check the `examples/` folder.
 - [ ] **Quorum-Based Consensus**: Introduction of Quorum mechanisms for read/write operations to guarantee **strong consistency** and higher reliability in distributed scenarios.
 - [ ] **NoSQL Database Support**: Extension of the *Multi-Storage* paradigm beyond object storage to include semi-structured data persistence (e.g., MongoDB, DynamoDB).
 
-See the [open issues][issues-url] for a full list of proposed features.
+See the [open issues][issues-url] for a complete list of proposed features.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -188,17 +188,6 @@ See the [open issues][issues-url] for a full list of proposed features.
 Distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
----
-
-## 📧 Contact
-
-**Luca Del Bue** - [LinkedIn Profile][linkedin-url]
-
-**Project Link**: [https://github.com/tizianocitro/m2cs][repo-url]
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 [repo-url]: https://github.com/tizianocitro/m2cs
