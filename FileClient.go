@@ -22,6 +22,10 @@ type FileClient struct {
 	lbStrategy      LoadBalancingStrategy
 	lb              loadbalancing.LoadBalancer
 	cache           *caching.FileCache
+	// pendingLatencies buffers SetLatency calls that arrive before the first
+	// GetObject (when the balancer has not yet been initialised). The map is
+	// consumed and set to nil as soon as the balancer is created.
+	pendingLatencies map[int]time.Duration
 }
 
 func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBalancingStrategy, storages ...filestorage.FileStorage) *FileClient {
@@ -165,17 +169,21 @@ func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (
 	var err error
 
 	if f.lb == nil {
-		var strategy loadbalancing.Strategy
 		switch f.lbStrategy {
 		case READ_REPLICA_FIRST:
-			strategy = loadbalancing.CLASSIC
+			f.lb, err = loadbalancing.Factory{}.NewLoadBalancer(loadbalancing.CLASSIC, groups)
 		case ROUND_ROBIN:
-			strategy = loadbalancing.ROUND_ROBIN
+			f.lb, err = loadbalancing.Factory{}.NewLoadBalancer(loadbalancing.ROUND_ROBIN, groups)
+		case LATENCY_BASED:
+			// Build a single flat group from the original storages slice so that
+			// the flat index used by SetLatency maps one-to-one with the position
+			// of each storage in the variadic argument of NewFileClient.
+			singleGroup := []loadbalancing.ClientGroup{{Clients: toLB(f.storages)}}
+			f.lb = loadbalancing.NewLatencyBasedLB(singleGroup, f.pendingLatencies)
+			f.pendingLatencies = nil
 		default:
 			return nil, fmt.Errorf("unsupported load balancing strategy: %v", f.lbStrategy)
 		}
-
-		f.lb, err = loadbalancing.Factory{}.NewLoadBalancer(strategy, groups)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create load balancer: %w", err)
 		}
@@ -346,6 +354,39 @@ func (f *FileClient) ClearCache() {
 	}
 }
 
+// SetLatency sets the initial or manually-observed latency for the storage at storageIndex (zero-based, matching the order of the variadic storages argument
+// passed to NewFileClient).
+//
+// It may be called before or after the first GetObject:
+//   - Before: the value is buffered and applied when the balancer is created.
+//   - After:  the value is forwarded immediately to the active balancer.
+//
+// The supplied duration seeds or overrides the EMA; subsequent GetObject calls will continue to refine it automatically.
+func (f *FileClient) SetLatency(storageIndex int, d time.Duration) error {
+	if f.lbStrategy != LATENCY_BASED {
+		return fmt.Errorf("SetLatency is only supported with the LATENCY_BASED strategy")
+	}
+	if storageIndex < 0 || storageIndex >= len(f.storages) {
+		return fmt.Errorf("storageIndex %d out of range [0, %d)", storageIndex, len(f.storages))
+	}
+
+	if f.lb == nil {
+		// Balancer not yet initialised; buffer the value for when it is created.
+		if f.pendingLatencies == nil {
+			f.pendingLatencies = make(map[int]time.Duration)
+		}
+		f.pendingLatencies[storageIndex] = d
+		return nil
+	}
+
+	// Balancer already active; apply the update immediately.
+	updater, ok := f.lb.(loadbalancing.LatencyUpdater)
+	if !ok {
+		return fmt.Errorf("internal error: active balancer does not implement LatencyUpdater")
+	}
+	return updater.SetLatency(storageIndex, d)
+}
+
 func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
 	var clients []loadbalancing.Client
 	for _, s := range storages {
@@ -382,4 +423,5 @@ type LoadBalancingStrategy int
 const (
 	READ_REPLICA_FIRST LoadBalancingStrategy = iota
 	ROUND_ROBIN
+	LATENCY_BASED
 )
