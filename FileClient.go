@@ -553,9 +553,5 @@ const (
 	ROUND_ROBIN
 	LATENCY_BASED
 	GEOPROXIMITY
-	// LEAST_LATENCY_P2C selects a backend by sampling two candidates at random
-	// (Power of Two Choices) and picking the one with the lower composite score.
-	// The score combines EMA latency, current in-flight load, and a configurable
-	// error margin. Use SetP2CLatency and SetErrorMargin to seed initial values.
 	LEAST_LATENCY_P2C
 )
