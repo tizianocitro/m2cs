@@ -25,7 +25,18 @@ type FileClient struct {
 	// pendingLatencies buffers SetLatency calls that arrive before the first
 	// GetObject (when the balancer has not yet been initialised). The map is
 	// consumed and set to nil as soon as the balancer is created.
+	// Used by both LATENCY_BASED and LEAST_LATENCY_P2C strategies.
 	pendingLatencies map[int]time.Duration
+	// pendingCoordinates buffers SetBackendLocation calls that arrive before the
+	// first GetObject. Key is the storage index in f.storages. Consumed and set
+	// to nil when the GEOPROXIMITY balancer is created.
+	pendingCoordinates map[int]loadbalancing.Coordinates
+	// pendingClientLoc buffers the SetClientLocation call that arrives before
+	// the first GetObject. nil means no client location has been set yet.
+	pendingClientLoc *loadbalancing.Coordinates
+	// pendingP2CErrorMargin is the global error margin for LEAST_LATENCY_P2C,
+	// set via SetErrorMargin before the first GetObject. nil means use the default.
+	pendingP2CErrorMargin *float64
 }
 
 func NewFileClient(replicationMode ReplicationMode, loadBalacingStrategy LoadBalancingStrategy, storages ...filestorage.FileStorage) *FileClient {
@@ -181,6 +192,20 @@ func (f *FileClient) GetObject(ctx context.Context, storeBox, fileName string) (
 			singleGroup := []loadbalancing.ClientGroup{{Clients: toLB(f.storages)}}
 			f.lb = loadbalancing.NewLatencyBasedLB(singleGroup, f.pendingLatencies)
 			f.pendingLatencies = nil
+		case GEOPROXIMITY:
+			singleGroup := []loadbalancing.ClientGroup{{Clients: toLB(f.storages)}}
+			f.lb = loadbalancing.NewGeoproximityLB(singleGroup, f.pendingCoordinates, f.pendingClientLoc)
+			f.pendingCoordinates = nil
+			f.pendingClientLoc = nil
+		case LEAST_LATENCY_P2C:
+			singleGroup := []loadbalancing.ClientGroup{{Clients: toLB(f.storages)}}
+			margin := 1.0 // default error margin
+			if f.pendingP2CErrorMargin != nil {
+				margin = *f.pendingP2CErrorMargin
+			}
+			f.lb = loadbalancing.NewLeastLatencyP2CLB(singleGroup, f.pendingLatencies, margin)
+			f.pendingLatencies = nil
+			f.pendingP2CErrorMargin = nil
 		default:
 			return nil, fmt.Errorf("unsupported load balancing strategy: %v", f.lbStrategy)
 		}
@@ -354,8 +379,10 @@ func (f *FileClient) ClearCache() {
 	}
 }
 
-// SetLatency sets the initial or manually-observed latency for the storage at storageIndex (zero-based, matching the order of the variadic storages argument
-// passed to NewFileClient).
+// SetLatency sets the initial or manually-observed latency for the storage at storageIndex
+// (zero-based, matching the order of the variadic storages argument passed to NewFileClient).
+//
+// Supported strategies: LATENCY_BASED and LEAST_LATENCY_P2C.
 //
 // It may be called before or after the first GetObject:
 //   - Before: the value is buffered and applied when the balancer is created.
@@ -363,8 +390,8 @@ func (f *FileClient) ClearCache() {
 //
 // The supplied duration seeds or overrides the EMA; subsequent GetObject calls will continue to refine it automatically.
 func (f *FileClient) SetLatency(storageIndex int, d time.Duration) error {
-	if f.lbStrategy != LATENCY_BASED {
-		return fmt.Errorf("SetLatency is only supported with the LATENCY_BASED strategy")
+	if f.lbStrategy != LATENCY_BASED && f.lbStrategy != LEAST_LATENCY_P2C {
+		return fmt.Errorf("SetLatency is only supported with the LATENCY_BASED or LEAST_LATENCY_P2C strategy")
 	}
 	if storageIndex < 0 || storageIndex >= len(f.storages) {
 		return fmt.Errorf("storageIndex %d out of range [0, %d)", storageIndex, len(f.storages))
@@ -385,6 +412,85 @@ func (f *FileClient) SetLatency(storageIndex int, d time.Duration) error {
 		return fmt.Errorf("internal error: active balancer does not implement LatencyUpdater")
 	}
 	return updater.SetLatency(storageIndex, d)
+}
+
+// SetBackendLocation assigns geographic coordinates to the storage at storageIndex
+// Returns an error if the current strategy is not GEOPROXIMITY or if
+// storageIndex is out of range.
+func (f *FileClient) SetBackendLocation(storageIndex int, lat, lon float64) error {
+	if f.lbStrategy != GEOPROXIMITY {
+		return fmt.Errorf("SetBackendLocation is only supported with the GEOPROXIMITY strategy")
+	}
+	if storageIndex < 0 || storageIndex >= len(f.storages) {
+		return fmt.Errorf("storageIndex %d out of range [0, %d)", storageIndex, len(f.storages))
+	}
+
+	coords := loadbalancing.Coordinates{Lat: lat, Lon: lon}
+
+	if f.lb == nil {
+		// Balancer not yet initialised; buffer the value for when it is created.
+		if f.pendingCoordinates == nil {
+			f.pendingCoordinates = make(map[int]loadbalancing.Coordinates)
+		}
+		f.pendingCoordinates[storageIndex] = coords
+		return nil
+	}
+
+	// Balancer already active; apply the update immediately.
+	setter, ok := f.lb.(loadbalancing.LocationSetter)
+	if !ok {
+		return fmt.Errorf("internal error: active balancer does not implement LocationSetter")
+	}
+	return setter.SetBackendLocation(storageIndex, coords)
+}
+
+// SetClientLocation sets the geographic position of the client. The balancer
+// uses this position to compute distances and select the nearest backend.
+// Returns an error if the current strategy is not GEOPROXIMITY.
+func (f *FileClient) SetClientLocation(lat, lon float64) error {
+	if f.lbStrategy != GEOPROXIMITY {
+		return fmt.Errorf("SetClientLocation is only supported with the GEOPROXIMITY strategy")
+	}
+
+	coords := loadbalancing.Coordinates{Lat: lat, Lon: lon}
+
+	if f.lb == nil {
+		// Balancer not yet initialised; buffer the value for when it is created.
+		f.pendingClientLoc = &coords
+		return nil
+	}
+
+	// Balancer already active; apply the update immediately.
+	setter, ok := f.lb.(loadbalancing.LocationSetter)
+	if !ok {
+		return fmt.Errorf("internal error: active balancer does not implement LocationSetter")
+	}
+	setter.SetClientLocation(coords)
+	return nil
+}
+
+
+
+// SetErrorMargin sets the error margin (in ms) for the LEAST_LATENCY_P2C strategy.
+// It may be called before or after the first GetObject.
+func (f *FileClient) SetErrorMargin(storageIndex int, margin float64) error {
+	if f.lbStrategy != LEAST_LATENCY_P2C {
+		return fmt.Errorf("SetErrorMargin is only supported with the LEAST_LATENCY_P2C strategy")
+	}
+	if storageIndex < 0 || storageIndex >= len(f.storages) {
+		return fmt.Errorf("storageIndex %d out of range [0, %d)", storageIndex, len(f.storages))
+	}
+
+	if f.lb == nil {
+		f.pendingP2CErrorMargin = &margin
+		return nil
+	}
+
+	updater, ok := f.lb.(loadbalancing.P2CUpdater)
+	if !ok {
+		return fmt.Errorf("internal error: active balancer does not implement P2CUpdater")
+	}
+	return updater.SetErrorMargin(storageIndex, margin)
 }
 
 func toLB(storages []filestorage.FileStorage) []loadbalancing.Client {
@@ -424,4 +530,6 @@ const (
 	READ_REPLICA_FIRST LoadBalancingStrategy = iota
 	ROUND_ROBIN
 	LATENCY_BASED
+	GEOPROXIMITY
+	LEAST_LATENCY_P2C
 )
